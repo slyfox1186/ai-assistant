@@ -130,11 +130,7 @@ async def main():
     device = get_device()
 
     tokenizer = AutoTokenizer.from_pretrained("sshleifer/distilbart-cnn-12-6")
-<<<<<<< HEAD
     summarizer = pipeline("summarization", model="sshleifer/distilbart-cnn-12-6", device=-1)
-=======
-    summarizer = pipeline("summarization", model="facebook/bart-large-cnn", device=-1)
->>>>>>> 2027e95443f208bb7a0c9eb2c10d151241680a1e
 
     db_handler = DatabaseHandler(db_name)
     web_scraper = WebScraper()
@@ -160,15 +156,11 @@ async def main():
         print("--------------------\n")
 
         data_analyzer.start_time = start_time
-<<<<<<< HEAD
         data_analyzer.original_texts = [item['content'] for item in scraped_data if isinstance(item.get('content'), str)]
-=======
-        data_analyzer.original_texts = [item['content'] for item in scraped_data if isinstance(item, dict) and 'content' in item]
->>>>>>> 2027e95443f208bb7a0c9eb2c10d151241680a1e
 
         summarized_data = data_analyzer.summarize_content(scraped_data, query)
         
-        texts = [item['content'] for item in scraped_data if isinstance(item, dict) and 'content' in item]
+        texts = [item['content'] for item in scraped_data if isinstance(item.get('content'), str)]
         total_text_length = sum(len(t) for t in texts if isinstance(t, str))
 
         dataset = Dataset.from_dict({'text': texts})
@@ -181,15 +173,7 @@ async def main():
             condensed_summary = condense_summary(combined_summary)
             cleaned_summary = remove_redundant_sentences(condensed_summary)
             cleaned_summary = remove_exact_duplicates(cleaned_summary)
-<<<<<<< HEAD
             final_response = nlp_processor.generate_response(cleaned_summary)
-=======
-            
-            # Generate response using NLPProcessor
-            scraped_data_dict = [{'content': item['content']} for item in scraped_data if isinstance(item, dict) and 'content' in item]
-            processed_response = nlp_processor.process_nlp(scraped_data_dict, query)
-            final_response = processed_response['response']
->>>>>>> 2027e95443f208bb7a0c9eb2c10d151241680a1e
             final_response = remove_exact_duplicates(final_response)
             
             data_analyzer.end_time = time.time()
@@ -197,55 +181,16 @@ async def main():
             # Clear the screen before displaying the final answer
             print_cleaned_text("")
             
-<<<<<<< HEAD
             data_analyzer.display_final_answer(final_response, query)
-=======
-            # Display the final answer with enhanced presentation
-            print("\n--- Query Result ---")
-            print(f"Query: {query}")
-            print("\nSummary:")
-            for sentence in final_response.split('. '):
-                print(f"- {sentence.strip()}.")
-            print("\nKey Information:")
-            print(processed_response['key_info'])
-            print("\nEntities:")
-            for entity in processed_response['entities']:
-                print(f"- {entity['word']} ({entity['entity']})")
-            print("\nSentiment:")
-            print(f"- {processed_response['sentiment']['label']} (Score: {processed_response['sentiment']['score']:.2f})")
-            print("\n--- Data Metrics ---")
->>>>>>> 2027e95443f208bb7a0c9eb2c10d151241680a1e
             
             total_summary_length = len(final_response)
             processing_time = data_analyzer.end_time - data_analyzer.start_time
             db_handler.store_data({'query': query, 'response': final_response})
-<<<<<<< HEAD
             db_handler.save_metrics(query=query, num_results=num_results, total_text_length=total_text_length, 
                                     total_summary_length=total_summary_length, processing_time=processing_time, 
                                     metric_name='', metric_value=0)
-=======
-            db_handler.save_metrics(metric_name='summary_length', metric_value=total_summary_length)
-            
-            # Collect user feedback
-            while True:
-                feedback = input("\nPlease rate the quality and relevance of the answer (1-5), or press 'q' to quit: ")
-                if feedback.lower() == 'q':
-                    break
-                try:
-                    rating = int(feedback)
-                    if 1 <= rating <= 5:
-                        comment = input("Please provide any additional feedback or comments (optional): ")
-                        db_handler.store_feedback(query, rating, comment)
-                        print("Thank you for your feedback!")
-                        break
-                    else:
-                        print("Invalid rating. Please enter a number between 1 and 5.")
-                except ValueError:
-                    print("Invalid input. Please enter a valid number or 'q' to quit.")
-            
->>>>>>> 2027e95443f208bb7a0c9eb2c10d151241680a1e
         else:
-            print_cleaned_text("I apologize, but I couldn't extract any meaningful information to provide a satisfactory answer. This could be due to the complexity of the query or limitations in the available data. Please try rephrasing your question or providing more context.")
+            print_cleaned_text("I'm sorry, but I couldn't extract any meaningful information from the search results. This could be due to network issues or the complexity of the question. Please try again or rephrase your question.")
     except Exception as e:
         print_cleaned_text(f"An error occurred while processing your request: {str(e)}")
 
