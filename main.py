@@ -5,115 +5,35 @@ import asyncio
 import time
 import os
 from transformers import pipeline, AutoTokenizer
-from datasets import Dataset
 import torch
 from database_handler import DatabaseHandler
 from web_scraper import WebScraper
 from data_analyzer import DataAnalyzer
 from nlp_processor import NLPProcessor
+from answer_enhancer import AnswerEnhancer
+from answer_optimizer import AnswerOptimizer
 import warnings
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
 import transformers
 import logging
 
+# Set environment variable to fix MKL error
+os.environ['MKL_SERVICE_FORCE_INTEL'] = '1'
+
 # Custom logger setup
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 handler = logging.StreamHandler()
-formatter = logging.Formatter('%(message)s')
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 handler.setFormatter(formatter)
 logger.addHandler(handler)
-logging.getLogger().handlers = []
 
 warnings.filterwarnings("ignore", category=UserWarning)
 transformers.logging.set_verbosity_error()
 
 def get_device():
-    return torch.device("cpu")
-
-def split_text(text, max_length, tokenizer):
-    words = text.split()
-    chunks = []
-    current_chunk = []
-    current_length = 0
-
-    for word in words:
-        word_length = len(tokenizer.encode(word, add_special_tokens=False))
-        if current_length + word_length <= max_length:
-            current_chunk.append(word)
-            current_length += word_length
-        else:
-            chunks.append(" ".join(current_chunk))
-            current_chunk = [word]
-            current_length = word_length
-
-    if current_chunk:
-        chunks.append(" ".join(current_chunk))
-
-    return chunks
-
-def truncate_text(text, max_length, tokenizer):
-    encoded_text = tokenizer.encode(text, truncation=True, max_length=max_length, return_tensors="pt")
-    return tokenizer.decode(encoded_text[0], skip_special_tokens=True)
-
-def summarize_text(batch, summarizer, tokenizer, max_length=1024):
-    summaries = []
-    for text in batch['text']:
-        if isinstance(text, str):
-            chunks = split_text(text, max_length, tokenizer)
-            chunk_summaries = []
-            for chunk in chunks:
-                truncated_text = truncate_text(chunk, max_length, tokenizer)
-                with warnings.catch_warnings():
-                    warnings.filterwarnings("ignore", category=UserWarning, message="Your max_length is set to")
-                    summary = summarizer(truncated_text, max_length=min(len(truncated_text) // 2, 256), min_length=10, do_sample=False)[0]['summary_text']
-                chunk_summaries.append(summary)
-            summary = " ".join(chunk_summaries)
-            summaries.append(summary)
-        else:
-            summaries.append('')
-    return {'summary': summaries}
-
-def condense_summary(summary):
-    sentences = summary.split('. ')
-    condensed_summary = '. '.join(sentences[:3]) + '.' if len(sentences) > 3 else summary
-    return condensed_summary
-
-def remove_redundant_sentences(text):
-    sentences = text.split('. ')
-    vectorizer = TfidfVectorizer().fit_transform(sentences)
-    vectors = vectorizer.toarray()
-    csim = cosine_similarity(vectors)
-
-    unique_sentences = []
-    seen_sentences = set()
-
-    for i, sentence in enumerate(sentences):
-        if sentence in seen_sentences:
-            continue
-        unique_sentences.append(sentence)
-        for j in range(i + 1, len(sentences)):
-            if csim[i, j] > 0.8:
-                seen_sentences.add(sentences[j])
-
-    return '. '.join(unique_sentences)
-
-def remove_exact_duplicates(text):
-    sentences = text.split('. ')
-    unique_sentences = []
-    seen = set()
-
-    for sentence in sentences:
-        cleaned_sentence = sentence.strip().lower()
-        if cleaned_sentence not in seen:
-            seen.add(cleaned_sentence)
-            unique_sentences.append(sentence)
-
-    return '. '.join(unique_sentences)
+    return torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def print_cleaned_text(text):
-    os.system('clear' if os.name == 'posix' else 'cls')
     print(text)
 
 async def main():
@@ -121,78 +41,116 @@ async def main():
     parser.add_argument('question', type=str, help='The question you want to ask.')
     parser.add_argument('--results', type=int, default=5, help='Number of search results to retrieve.')
     parser.add_argument('--db-name', type=str, default='ai_assistant.db', help='Database name')
+    parser.add_argument('--iterations', '-i', type=int, default=1, help='Number of batch iterations to perform for optimization')
+    parser.add_argument('--train', action='store_true', help='Train the model using the provided topics')
     args = parser.parse_args()
 
     query = args.question
     num_results = args.results
     db_name = args.db_name
+    iterations = args.iterations
+    train = args.train
+
+    logger.info(f"Processing query: {query}")
+    logger.info(f"Number of results: {num_results}")
+    logger.info(f"Database name: {db_name}")
+    logger.info(f"Iterations: {iterations}")
+    logger.info(f"Train flag: {train}")
 
     device = get_device()
+    logger.info(f"Using device: {device}")
 
     tokenizer = AutoTokenizer.from_pretrained("sshleifer/distilbart-cnn-12-6")
-    summarizer = pipeline("summarization", model="sshleifer/distilbart-cnn-12-6", device=-1)
+    summarizer = pipeline("summarization", model="sshleifer/distilbart-cnn-12-6", device=device)
 
     db_handler = DatabaseHandler(db_name)
     web_scraper = WebScraper()
     data_analyzer = DataAnalyzer(db_name)
     nlp_processor = NLPProcessor()
+    answer_enhancer = AnswerEnhancer()
+    answer_optimizer = AnswerOptimizer()
 
     cached_answer = db_handler.retrieve_data(query)
     if cached_answer:
+        logger.info("Using cached answer")
         print_cleaned_text(cached_answer)
         return
 
     try:
         start_time = time.time()
+        logger.info("Starting web scraping")
         scraped_data, formatted_data = web_scraper.scrape(query, num_results)
 
         if not scraped_data:
+            logger.warning("No relevant information found")
             print_cleaned_text("I'm sorry, but I couldn't find any relevant information for your question.")
             return
 
-        print("\n--- Scraped Data ---")
+        logger.debug("Scraped data:")
         for item in formatted_data:
-            print(item)
-        print("--------------------\n")
+            logger.debug(item)
 
         data_analyzer.start_time = start_time
         data_analyzer.original_texts = [item['content'] for item in scraped_data if isinstance(item.get('content'), str)]
 
-        summarized_data = data_analyzer.summarize_content(scraped_data, query)
+        logger.info("Processing NLP")
+        try:
+            processed_response = nlp_processor.process_nlp(scraped_data, query)
+        except Exception as e:
+            logger.exception(f"Error during NLP processing: {e}")
+            print_cleaned_text("An error occurred during NLP processing. Please try again.")
+            return
+
+        if not isinstance(processed_response, dict) or 'response' not in processed_response:
+            logger.error(f"Unexpected response format from NLP processor: {processed_response}")
+            print_cleaned_text("Received an unexpected response format from the NLP processor. Please try again.")
+            return
+
+        logger.info("Enhancing answer")
+        try:
+            enhanced_response = answer_enhancer.enhance_answer(query, processed_response['response'])
+        except Exception as e:
+            logger.error(f"Error during answer enhancement: {e}")
+            enhanced_response = processed_response['response']  # Use the original response if enhancement fails
+
+        logger.info("Optimizing answer")
+        try:
+            optimized_response = answer_optimizer.optimize_answer(query, enhanced_response)
+        except Exception as e:
+            logger.error(f"Error during answer optimization: {e}")
+            optimized_response = enhanced_response  # Use the enhanced response if optimization fails
+
+        data_analyzer.end_time = time.time()
         
-        texts = [item['content'] for item in scraped_data if isinstance(item.get('content'), str)]
-        total_text_length = sum(len(t) for t in texts if isinstance(t, str))
+        logger.info("Displaying final answer")
+        data_analyzer.display_final_answer(optimized_response, query)
+        
+        total_summary_length = len(optimized_response)
+        total_text_length = sum(len(t) for t in data_analyzer.original_texts if isinstance(t, str))
+        processing_time = data_analyzer.end_time - data_analyzer.start_time
+        
+        logger.info(f"Storing data in database")
+        db_handler.store_data({'query': query, 'response': optimized_response})
+        db_handler.save_metrics(query=query, num_results=num_results, total_text_length=total_text_length, 
+                                total_summary_length=total_summary_length, processing_time=processing_time, 
+                                metric_name='', metric_value=0)
+        
+        if train:
+            logger.info("Training the model using the optimized answer.")
+            answer_optimizer.train(query, optimized_response)
 
-        dataset = Dataset.from_dict({'text': texts})
-        summarized_dataset = dataset.map(lambda batch: summarize_text(batch, summarizer, tokenizer), batched=True, batch_size=8)
-
-        valid_summaries = [s for s in summarized_dataset['summary'] if s]
-
-        if valid_summaries:
-            combined_summary = ' '.join(valid_summaries)
-            condensed_summary = condense_summary(combined_summary)
-            cleaned_summary = remove_redundant_sentences(condensed_summary)
-            cleaned_summary = remove_exact_duplicates(cleaned_summary)
-            final_response = nlp_processor.generate_response(cleaned_summary)
-            final_response = remove_exact_duplicates(final_response)
-            
-            data_analyzer.end_time = time.time()
-            
-            # Clear the screen before displaying the final answer
-            print_cleaned_text("")
-            
-            data_analyzer.display_final_answer(final_response, query)
-            
-            total_summary_length = len(final_response)
-            processing_time = data_analyzer.end_time - data_analyzer.start_time
-            db_handler.store_data({'query': query, 'response': final_response})
-            db_handler.save_metrics(query=query, num_results=num_results, total_text_length=total_text_length, 
-                                    total_summary_length=total_summary_length, processing_time=processing_time, 
-                                    metric_name='', metric_value=0)
-        else:
-            print_cleaned_text("I'm sorry, but I couldn't extract any meaningful information from the search results. This could be due to network issues or the complexity of the question. Please try again or rephrase your question.")
     except Exception as e:
-        print_cleaned_text(f"An error occurred while processing your request: {str(e)}")
+        logger.exception(f"An error occurred while processing the request: {e}")
+        print_cleaned_text(f"An error occurred while processing your request. Please check the logs for more details. Error: {str(e)}")
+        enhanced_response = None
+        optimized_response = None
 
+    if optimized_response:
+        print_cleaned_text(optimized_response)
+    elif enhanced_response:
+        print_cleaned_text(enhanced_response)
+    else:
+        print_cleaned_text("Sorry, I couldn't generate a response. Please try again.")
+        
 if __name__ == "__main__":
     asyncio.run(main())

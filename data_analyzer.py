@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import logging
 import sqlite3
@@ -7,6 +7,8 @@ from sklearn.cluster import KMeans
 from transformers import pipeline
 from database_handler import DatabaseHandler
 import warnings
+import json
+import sys
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -73,9 +75,6 @@ class DataAnalyzer:
         print("---------------------")
 
 if __name__ == "__main__":
-    import json
-    import sys
-
     if len(sys.argv) != 3:
         print("Usage: python data_analyzer.py <data_file> <query>")
         sys.exit(1)

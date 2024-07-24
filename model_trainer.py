@@ -1,20 +1,16 @@
 #!/usr/bin/env python3
 
 import logging
-from transformers import BartForConditionalGeneration, BartTokenizer, Trainer, TrainingArguments, GenerationConfig, TrainerCallback
+from transformers import BartForConditionalGeneration, BartTokenizer, Trainer, TrainingArguments
 from datasets import load_dataset
-
-# Disable wandb integration
-class NoWandbCallback(TrainerCallback):
-    def on_init_end(self, args, state, control, **kwargs):
-        args.report_to = []
+from database_handler import DatabaseHandler
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Function to train the model
-def train_model(model_name: str = "facebook/bart-large-cnn", dataset_name: str = "cnn_dailymail", config: str = "3.0.0"):
+def train_model(model_name: str = "facebook/bart-large-cnn", dataset_name: str = "cnn_dailymail", config: str = "3.0.0", db_path: str = "ai_assistant.db"):
     logger.info(f"Starting model training for {model_name}...")
     
     # Load the dataset with a specified config
@@ -44,40 +40,29 @@ def train_model(model_name: str = "facebook/bart-large-cnn", dataset_name: str =
         per_device_train_batch_size=2,
         save_steps=10_000,
         save_total_limit=2,
-        report_to=[]  # Disable reporting to wandb
+        report_to=[]
     )
 
-    # Initialize the Trainer with the NoWandbCallback
+    # Initialize the Trainer
     trainer = Trainer(
         model=model,
         args=training_args,
         train_dataset=tokenized_datasets["train"],
-        eval_dataset=tokenized_datasets["validation"],
-        callbacks=[NoWandbCallback]
+        eval_dataset=tokenized_datasets["validation"]
     )
 
     # Train the model
     trainer.train()
     logger.info("Model training completed.")
 
-    # Save the model and tokenizer
+    # Save the trained model
     model.save_pretrained("./model")
     tokenizer.save_pretrained("./model")
-
-    # Set custom generation configuration
-    generation_config = GenerationConfig(
-        max_length=142,
-        min_length=56,
-        early_stopping=True,
-        num_beams=4,
-        length_penalty=2.0,
-        no_repeat_ngram_size=3,
-        forced_bos_token_id=0,
-        forced_eos_token_id=2
-    )
-
-    # Save the generation configuration
-    generation_config.save_pretrained("./model")
+    
+    # Save the trained model to the database
+    db_handler = DatabaseHandler(db_path)
+    db_handler.save_model(model)
+    logger.info("Trained model saved to the database.")
 
 if __name__ == "__main__":
     train_model()

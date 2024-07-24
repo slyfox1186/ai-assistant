@@ -5,6 +5,7 @@ import logging
 from contextlib import contextmanager
 import time
 import os
+import pickle
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -36,6 +37,10 @@ class DatabaseHandler:
                                   id INTEGER PRIMARY KEY,
                                   metric_name TEXT NOT NULL,
                                   metric_value REAL NOT NULL)''')
+                cursor.execute('''CREATE TABLE models (
+                                  id INTEGER PRIMARY KEY,
+                                  model_data BLOB
+                                  )''')
             else:
                 cursor.execute("PRAGMA table_info(Data)")
                 columns = [column[1] for column in cursor.fetchall()]
@@ -50,6 +55,14 @@ class DatabaseHandler:
                                       id INTEGER PRIMARY KEY,
                                       metric_name TEXT NOT NULL,
                                       metric_value REAL NOT NULL)''')
+                cursor.execute("PRAGMA table_info(models)")
+                models_columns = [column[1] for column in cursor.fetchall()]
+                if not models_columns:
+                    logger.info("Creating models table")
+                    cursor.execute('''CREATE TABLE models (
+                                      id INTEGER PRIMARY KEY,
+                                      model_data BLOB
+                                      )''')
             
             conn.commit()
 
@@ -125,3 +138,20 @@ class DatabaseHandler:
                 VALUES (?, ?)
             ''', (metric_name, metric_value))
             conn.commit()
+
+    def save_model(self, model):
+        model_data = pickle.dumps(model)
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("INSERT INTO models (model_data) VALUES (?)", (model_data,))
+            conn.commit()
+
+    def load_model(self, model_id):
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT model_data FROM models WHERE id = ?", (model_id,))
+            model_data = cursor.fetchone()
+            if model_data:
+                return pickle.loads(model_data[0])
+            else:
+                return None
