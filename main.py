@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 import argparse
-import logging
 import asyncio
 import time
 import os
@@ -12,19 +11,26 @@ from database_handler import DatabaseHandler
 from web_scraper import WebScraper
 from data_analyzer import DataAnalyzer
 from nlp_processor import NLPProcessor
-import json
 import warnings
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-warnings.filterwarnings("ignore", category=UserWarning, message="Your max_length is set to")
+import transformers
+import logging
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# Custom logger setup
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+handler = logging.StreamHandler()
+formatter = logging.Formatter('%(message)s')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+logging.getLogger().handlers = []
+
+warnings.filterwarnings("ignore", category=UserWarning)
+transformers.logging.set_verbosity_error()
 
 def get_device():
-    # Default to CPU since CUDA is not available
-    device = torch.device("cpu")
-    logging.info(f"Using CPU")
-    return device
+    return torch.device("cpu")
 
 def split_text(text, max_length, tokenizer):
     words = text.split()
@@ -59,12 +65,13 @@ def summarize_text(batch, summarizer, tokenizer, max_length=1024):
             chunk_summaries = []
             for chunk in chunks:
                 truncated_text = truncate_text(chunk, max_length, tokenizer)
-                summary = summarizer(truncated_text, max_length=256, min_length=30, do_sample=False)[0]['summary_text']
+                with warnings.catch_warnings():
+                    warnings.filterwarnings("ignore", category=UserWarning, message="Your max_length is set to")
+                    summary = summarizer(truncated_text, max_length=min(len(truncated_text) // 2, 256), min_length=10, do_sample=False)[0]['summary_text']
                 chunk_summaries.append(summary)
             summary = " ".join(chunk_summaries)
             summaries.append(summary)
         else:
-            logging.warning(f"Unexpected data type in summarize_text: {type(text)}")
             summaries.append('')
     return {'summary': summaries}
 
@@ -87,7 +94,7 @@ def remove_redundant_sentences(text):
             continue
         unique_sentences.append(sentence)
         for j in range(i + 1, len(sentences)):
-            if csim[i, j] > 0.8:  # Adjust threshold as needed
+            if csim[i, j] > 0.8:
                 seen_sentences.add(sentences[j])
 
     return '. '.join(unique_sentences)
@@ -106,7 +113,7 @@ def remove_exact_duplicates(text):
     return '. '.join(unique_sentences)
 
 def print_cleaned_text(text):
-    os.system('clear')  # Clear the terminal screen
+    os.system('clear' if os.name == 'posix' else 'cls')
     print(text)
 
 async def main():
@@ -120,13 +127,10 @@ async def main():
     num_results = args.results
     db_name = args.db_name
 
-    logging.info(f"Searching for: {query}")
-
-    # No CUDA device check, always use CPU
     device = get_device()
 
     tokenizer = AutoTokenizer.from_pretrained("sshleifer/distilbart-cnn-12-6")
-    summarizer = pipeline("summarization", model="sshleifer/distilbart-cnn-12-6", device=-1)  # Use CPU
+    summarizer = pipeline("summarization", model="sshleifer/distilbart-cnn-12-6", device=-1)
 
     db_handler = DatabaseHandler(db_name)
     web_scraper = WebScraper()
@@ -140,17 +144,19 @@ async def main():
 
     try:
         start_time = time.time()
-        scraped_data = web_scraper.scrape(query, num_results)
-        processing_time = time.time() - start_time
+        scraped_data, formatted_data = web_scraper.scrape(query, num_results)
 
         if not scraped_data:
             print_cleaned_text("I'm sorry, but I couldn't find any relevant information for your question.")
             return
 
-        logging.info(f"Scraped data: {json.dumps(scraped_data, indent=4)}")
+        print("\n--- Scraped Data ---")
+        for item in formatted_data:
+            print(item)
+        print("--------------------\n")
 
-        labels = data_analyzer.analyze_data(scraped_data)
-        logging.info(f"Data analysis complete. Labels assigned.")
+        data_analyzer.start_time = start_time
+        data_analyzer.original_texts = [item['content'] for item in scraped_data if isinstance(item.get('content'), str)]
 
         summarized_data = data_analyzer.summarize_content(scraped_data, query)
         
@@ -166,24 +172,26 @@ async def main():
             combined_summary = ' '.join(valid_summaries)
             condensed_summary = condense_summary(combined_summary)
             cleaned_summary = remove_redundant_sentences(condensed_summary)
-            cleaned_summary = remove_exact_duplicates(cleaned_summary)  # Ensuring exact duplicates are removed
+            cleaned_summary = remove_exact_duplicates(cleaned_summary)
             final_response = nlp_processor.generate_response(cleaned_summary)
             final_response = remove_exact_duplicates(final_response)
-            print_cleaned_text(final_response)
             
-            total_summary_length = sum(len(s) for s in valid_summaries)
+            data_analyzer.end_time = time.time()
+            
+            # Clear the screen before displaying the final answer
+            print_cleaned_text("")
+            
+            data_analyzer.display_final_answer(final_response, query)
+            
+            total_summary_length = len(final_response)
+            processing_time = data_analyzer.end_time - data_analyzer.start_time
             db_handler.store_data({'query': query, 'response': final_response})
             db_handler.save_metrics(query=query, num_results=num_results, total_text_length=total_text_length, 
                                     total_summary_length=total_summary_length, processing_time=processing_time, 
                                     metric_name='', metric_value=0)
-            
-            logging.info(f"Summary Length: {total_summary_length}")
-            logging.info(f"Text Length: {total_text_length}")
-            logging.info(f"Processing Time: {processing_time:.2f} seconds")
         else:
             print_cleaned_text("I'm sorry, but I couldn't extract any meaningful information from the search results. This could be due to network issues or the complexity of the question. Please try again or rephrase your question.")
     except Exception as e:
-        logging.error(f"Error during processing: {str(e)}")
         print_cleaned_text(f"An error occurred while processing your request: {str(e)}")
 
 if __name__ == "__main__":

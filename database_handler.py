@@ -6,7 +6,12 @@ from contextlib import contextmanager
 import time
 import os
 
-logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+handler = logging.StreamHandler()
+formatter = logging.Formatter('%(message)s')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
 
 class DatabaseHandler:
     def __init__(self, db_name='ai_assistant.db'):
@@ -20,7 +25,7 @@ class DatabaseHandler:
             cursor = conn.cursor()
             
             if not db_exists:
-                logging.info(f"Creating new database: {self.db_name}")
+                logger.info(f"Creating new database: {self.db_name}")
                 cursor.execute('''CREATE TABLE Data 
                                   (id INTEGER PRIMARY KEY, query TEXT, response TEXT, timestamp REAL)''')
                 cursor.execute('''CREATE TABLE Feedback
@@ -32,16 +37,15 @@ class DatabaseHandler:
                                   metric_name TEXT NOT NULL,
                                   metric_value REAL NOT NULL)''')
             else:
-                logging.info(f"Checking and updating existing database: {self.db_name}")
                 cursor.execute("PRAGMA table_info(Data)")
                 columns = [column[1] for column in cursor.fetchall()]
                 if 'timestamp' not in columns:
-                    logging.info("Adding timestamp column to Data table")
+                    logger.info("Adding timestamp column to Data table")
                     cursor.execute("ALTER TABLE Data ADD COLUMN timestamp REAL")
                 cursor.execute("PRAGMA table_info(metrics)")
                 metrics_columns = [column[1] for column in cursor.fetchall()]
                 if not metrics_columns:
-                    logging.info("Creating metrics table")
+                    logger.info("Creating metrics table")
                     cursor.execute('''CREATE TABLE metrics (
                                       id INTEGER PRIMARY KEY,
                                       metric_name TEXT NOT NULL,
@@ -75,7 +79,7 @@ class DatabaseHandler:
                     if isinstance(parsed_response, dict) and 'response' in parsed_response:
                         return result[0]
                 except:
-                    logging.warning(f"Invalid cached response for query: {query}")
+                    logger.warning(f"Invalid cached response for query: {query}")
                     self.clear_cache(query)
             return None
     
@@ -88,14 +92,14 @@ class DatabaseHandler:
                 cursor.execute('INSERT INTO Feedback (query_id, rating, comment, timestamp) VALUES (?, ?, ?, ?)',
                                (query_id[0], rating, comment, time.time()))
             else:
-                logging.warning(f"No matching query found for feedback: {query}")
+                logger.warning(f"No matching query found for feedback: {query}")
     
     def clear_cache(self, query):
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute('DELETE FROM Data WHERE query=?', (query,))
             conn.commit()
-            logging.info(f"Cleared cache for query: {query}")
+            logger.info(f"Cleared cache for query: {query}")
     
     def clean_database(self):
         with self.get_connection() as conn:
@@ -103,7 +107,7 @@ class DatabaseHandler:
             cursor.execute('''DELETE FROM Data WHERE id NOT IN 
                               (SELECT id FROM Data GROUP BY query HAVING MAX(timestamp))''')
             conn.commit()
-            logging.info(f"Cleaned {cursor.rowcount} outdated entries from the database.")
+            logger.info(f"Cleaned {cursor.rowcount} outdated entries from the database.")
     
     def get_feedback_statistics(self):
         with self.get_connection() as conn:
@@ -113,7 +117,7 @@ class DatabaseHandler:
             return {'average_rating': avg_rating, 'total_feedback': count}
     
     def save_metrics(self, query, num_results, total_text_length, total_summary_length, processing_time, metric_name, metric_value):
-        logging.info(f"Saving metrics for query: {query}")
+        logger.info(f"Saving metrics for query: {query}")
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute('''

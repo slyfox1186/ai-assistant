@@ -13,7 +13,12 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import nltk
 
-logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+handler = logging.StreamHandler()
+formatter = logging.Formatter('%(message)s')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
 
 # Download necessary NLTK data
 nltk.download('punkt', quiet=True)
@@ -61,7 +66,7 @@ class RetrievalAugmentedGeneration:
 rag = RetrievalAugmentedGeneration()
 
 def process_nlp(data, query):
-    logging.info("Starting NLP processing...")
+    logger.info("Starting NLP processing...")
     model_name = 'google/flan-t5-large'
     
     try:
@@ -70,18 +75,18 @@ def process_nlp(data, query):
         sentiment_pipeline = pipeline("sentiment-analysis")
         summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
     except Exception as e:
-        logging.error(f"Failed to load model {model_name}: {e}")
+        logger.error(f"Failed to load model {model_name}: {e}")
         return f"Failed to load model {model_name}. Error: {e}"
     
     try:
         # Add scraped data to knowledge base
         content_list = [item['content'] for item in data if isinstance(item.get('content'), str) and item['content'].strip()]
-        logging.info(f"Content list: {content_list}")
+        logger.info(f"Content list: {content_list}")
         rag.add_to_knowledge_base(content_list)
         
         # Retrieve relevant information
         retrieved_info = rag.retrieve(query)
-        logging.info(f"Retrieved info: {retrieved_info}")
+        logger.info(f"Retrieved info: {retrieved_info}")
         context = " ".join([str(info) for info in retrieved_info])  # Ensure all items are strings
         
         if not context:
@@ -117,12 +122,12 @@ def process_nlp(data, query):
             'key_info': key_info
         }
         
-        logging.info("NLP processing completed.")
+        logger.info("NLP processing completed.")
         return processed_response
     except Exception as e:
-        logging.error(f"Error during NLP processing: {e}")
-        logging.error(f"Data: {data}")
-        logging.error(f"Query: {query}")
+        logger.error(f"Error during NLP processing: {e}")
+        logger.error(f"Data: {data}")
+        logger.error(f"Query: {query}")
         return f"Error during NLP processing: {e}"
 
 def extract_key_information(text):

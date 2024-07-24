@@ -4,7 +4,7 @@ import logging
 from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import quote_plus
 
-logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class WebScraper:
     def __init__(self):
@@ -34,13 +34,11 @@ class WebScraper:
                                 'content': f"{title.text}. {snippet.text}"
                             })
                 return results
-            
         except requests.RequestException as e:
-            logging.error(f"Error scraping {url}: {e}")
+            logger.error(f"Error scraping {url}: {e}")
         return None
 
     def scrape(self, query, num_results):
-        logging.info(f"Scraping data for query: {query}")
         encoded_query = quote_plus(query)
         urls = [
             (f"https://www.google.com/search?q={encoded_query}&num={num_results}", 'Google'),
@@ -50,15 +48,12 @@ class WebScraper:
             results = list(executor.map(lambda x: self.scrape_url(*x, num_results), urls))
         
         data = [item for sublist in results if sublist for item in sublist]
-        logging.info(f"Scraped data: {data}")
-        return data
-
-if __name__ == "__main__":
-    scraper = WebScraper()
-    query = input("Enter your question: ")
-    num_results = int(input("Enter the number of search results: "))
-    results = scraper.scrape(query, num_results)
-    for result in results:
-        print(f"Source: {result['source']}")
-        print(f"Content: {result['content'][:100]}...")  # Print first 100 characters
-        print()
+        
+        # Format the scraped data
+        formatted_data = []
+        for item in data:
+            source = item['source']
+            content = item['content'][:97] + '...' if len(item['content']) > 100 else item['content']
+            formatted_data.append(f"{source}: {content}")
+        
+        return data, formatted_data
