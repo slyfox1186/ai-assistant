@@ -5,32 +5,73 @@ import logging
 import asyncio
 import time
 import os
-from transformers import AutoTokenizer, pipeline, AutoModelForSeq2SeqLM
-from sentence_transformers import SentenceTransformer, util
+from transformers import pipeline, AutoTokenizer
+from datasets import Dataset
 import torch
-import spacy
-import nltk
-from nltk.corpus import stopwords
 from database_handler import DatabaseHandler
 from web_scraper import WebScraper
 from data_analyzer import DataAnalyzer
+from nlp_processor import NLPProcessor
 import json
 import warnings
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-from typing import List, Dict
-
 warnings.filterwarnings("ignore", category=UserWarning, message="Your max_length is set to")
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-nltk.download('punkt', quiet=True)
-nltk.download('stopwords', quiet=True)
-
 def get_device():
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    logging.info(f"Using device: {device}")
+    # Default to CPU since CUDA is not available
+    device = torch.device("cpu")
+    logging.info(f"Using CPU")
     return device
+
+def split_text(text, max_length, tokenizer):
+    words = text.split()
+    chunks = []
+    current_chunk = []
+    current_length = 0
+
+    for word in words:
+        word_length = len(tokenizer.encode(word, add_special_tokens=False))
+        if current_length + word_length <= max_length:
+            current_chunk.append(word)
+            current_length += word_length
+        else:
+            chunks.append(" ".join(current_chunk))
+            current_chunk = [word]
+            current_length = word_length
+
+    if current_chunk:
+        chunks.append(" ".join(current_chunk))
+
+    return chunks
+
+def truncate_text(text, max_length, tokenizer):
+    encoded_text = tokenizer.encode(text, truncation=True, max_length=max_length, return_tensors="pt")
+    return tokenizer.decode(encoded_text[0], skip_special_tokens=True)
+
+def summarize_text(batch, summarizer, tokenizer, max_length=1024):
+    summaries = []
+    for text in batch['text']:
+        if isinstance(text, str):
+            chunks = split_text(text, max_length, tokenizer)
+            chunk_summaries = []
+            for chunk in chunks:
+                truncated_text = truncate_text(chunk, max_length, tokenizer)
+                summary = summarizer(truncated_text, max_length=256, min_length=30, do_sample=False)[0]['summary_text']
+                chunk_summaries.append(summary)
+            summary = " ".join(chunk_summaries)
+            summaries.append(summary)
+        else:
+            logging.warning(f"Unexpected data type in summarize_text: {type(text)}")
+            summaries.append('')
+    return {'summary': summaries}
+
+def condense_summary(summary):
+    sentences = summary.split('. ')
+    condensed_summary = '. '.join(sentences[:3]) + '.' if len(sentences) > 3 else summary
+    return condensed_summary
 
 def remove_redundant_sentences(text):
     sentences = text.split('. ')
@@ -65,127 +106,8 @@ def remove_exact_duplicates(text):
     return '. '.join(unique_sentences)
 
 def print_cleaned_text(text):
-    os.system('clear' if os.name == 'posix' else 'cls')  # Clear the terminal screen
+    os.system('clear')  # Clear the terminal screen
     print(text)
-
-def extract_text_content(item):
-    if isinstance(item, dict) and 'content' in item:
-        content = item['content']
-        if isinstance(content, str):
-            return content
-        elif isinstance(content, list):
-            return ' '.join(str(c) for c in content if c)
-    elif isinstance(item, list):
-        return ' '.join(str(c) for c in item if c)
-    elif isinstance(item, str):
-        return item
-    return ''
-
-class AdvancedNLPProcessor:
-    def __init__(self, model_name="google/flan-t5-large", sentence_model_name='all-MiniLM-L6-v2', summarizer_model_name="facebook/bart-large-cnn"):
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        logging.info(f"Using device: {self.device}")
-
-        self.qa_model = AutoModelForSeq2SeqLM.from_pretrained(model_name).to(self.device)
-        self.qa_tokenizer = AutoTokenizer.from_pretrained(model_name)
-        
-        self.sentence_model = SentenceTransformer(sentence_model_name).to(self.device)
-        
-        self.summarizer = pipeline("summarization", model=summarizer_model_name, device=0 if self.device.type == "cuda" else -1)
-        
-        self.nlp = spacy.load("en_core_web_sm")
-        
-        self.stop_words = set(stopwords.words('english'))
-
-    def generate_answer(self, query: str, context: str) -> str:
-        input_text = f"Answer the following question based on the given context. If the context doesn't contain enough information, say so and provide the best possible answer based on general knowledge.\nQuestion: {query}\nContext: {context}"
-        inputs = self.qa_tokenizer(input_text, return_tensors='pt', max_length=1024, truncation=True).to(self.device)
-        
-        with torch.no_grad():
-            outputs = self.qa_model.generate(**inputs, max_length=200, min_length=50, length_penalty=2.0, num_beams=4, early_stopping=True)
-        
-        return self.qa_tokenizer.decode(outputs[0], skip_special_tokens=True)
-
-    def semantic_search(self, query: str, documents: List[str], top_k: int = 3) -> List[str]:
-        query_embedding = self.sentence_model.encode(query, convert_to_tensor=True)
-        document_embeddings = self.sentence_model.encode(documents, convert_to_tensor=True)
-        
-        cos_scores = util.cos_sim(query_embedding, document_embeddings)[0]
-        top_results = torch.topk(cos_scores, k=min(top_k, len(documents)))
-        
-        return [documents[idx] for idx in top_results.indices]
-
-    def extract_key_information(self, text: str) -> str:
-        doc = self.nlp(text)
-        sentences = [sent.text for sent in doc.sents]
-        
-        # Remove stopwords and lemmatize
-        processed_sentences = [
-            ' '.join([token.lemma_ for token in self.nlp(sentence) if token.text.lower() not in self.stop_words])
-            for sentence in sentences
-        ]
-        
-        # Calculate TF-IDF scores
-        vectorizer = TfidfVectorizer(min_df=1, max_df=0.9)
-        tfidf_matrix = vectorizer.fit_transform(processed_sentences)
-        feature_names = vectorizer.get_feature_names_out()
-        
-        # Get top keywords for each sentence
-        keywords = []
-        for i, sentence in enumerate(processed_sentences):
-            tfidf_row = tfidf_matrix[i].toarray()[0]
-            sorted_items = sorted(zip(tfidf_row, feature_names), key=lambda x: x[0], reverse=True)
-            keywords.append([item[1] for item in sorted_items[:5]])
-        
-        # Score sentences based on keywords
-        sentence_scores = [sum([1 for keyword in sentence_keywords if keyword in ' '.join(keywords).split()]) for sentence_keywords in keywords]
-        
-        # Select top sentences
-        top_sentence_indices = sorted(range(len(sentence_scores)), key=lambda i: sentence_scores[i], reverse=True)[:3]
-        key_sentences = [sentences[i] for i in sorted(top_sentence_indices)]
-        
-        return ' '.join(key_sentences) if key_sentences else "No key information extracted."
-
-    def entity_recognition(self, text: str) -> List[Dict[str, str]]:
-        doc = self.nlp(text)
-        return [{'entity': ent.text, 'label': ent.label_} for ent in doc.ents]
-
-    def summarize(self, text: str) -> str:
-        return self.summarizer(text, max_length=100, min_length=30, do_sample=False)[0]['summary_text']
-
-    def process(self, query: str, documents: List[str]) -> Dict:
-        # Flatten and ensure all items are strings
-        flat_documents = []
-        for doc in documents:
-            if isinstance(doc, list):
-                flat_documents.extend([str(item) for item in doc if item])
-            elif doc:
-                flat_documents.append(str(doc))
-        
-        if not flat_documents:
-            return {
-                'query': query,
-                'answer': "I'm sorry, but I couldn't find any relevant information to answer your question.",
-                'key_information': "",
-                'entities': [],
-                'summary': ""
-            }
-        
-        relevant_docs = self.semantic_search(query, flat_documents)
-        context = " ".join(relevant_docs)
-        
-        answer = self.generate_answer(query, context)
-        key_info = self.extract_key_information(answer)
-        entities = self.entity_recognition(answer)
-        summary = self.summarize(answer)
-        
-        return {
-            'query': query,
-            'answer': answer,
-            'key_information': key_info,
-            'entities': entities,
-            'summary': summary
-        }
 
 async def main():
     parser = argparse.ArgumentParser(description='Ask a question and get an answer by searching the web.')
@@ -199,14 +121,17 @@ async def main():
     db_name = args.db_name
 
     logging.info(f"Searching for: {query}")
-    logging.info(f"Number of results to retrieve: {num_results}")
 
+    # No CUDA device check, always use CPU
     device = get_device()
+
+    tokenizer = AutoTokenizer.from_pretrained("sshleifer/distilbart-cnn-12-6")
+    summarizer = pipeline("summarization", model="sshleifer/distilbart-cnn-12-6", device=-1)  # Use CPU
 
     db_handler = DatabaseHandler(db_name)
     web_scraper = WebScraper()
     data_analyzer = DataAnalyzer(db_name)
-    nlp_processor = AdvancedNLPProcessor()
+    nlp_processor = NLPProcessor()
 
     cached_answer = db_handler.retrieve_data(query)
     if cached_answer:
@@ -227,34 +152,36 @@ async def main():
         labels = data_analyzer.analyze_data(scraped_data)
         logging.info(f"Data analysis complete. Labels assigned.")
 
-        # Extract text content from scraped data
-        texts = []
-        for item in scraped_data:
-            extracted_text = extract_text_content(item)
-            if extracted_text:
-                texts.append(extracted_text)
+        summarized_data = data_analyzer.summarize_content(scraped_data, query)
         
-        if not texts:
-            print_cleaned_text("I'm sorry, but I couldn't extract any meaningful text from the search results.")
-            return
+        texts = [item['content'] for item in scraped_data if isinstance(item.get('content'), str)]
+        total_text_length = sum(len(t) for t in texts if isinstance(t, str))
 
-        total_text_length = sum(len(str(t)) for t in texts)
+        dataset = Dataset.from_dict({'text': texts})
+        summarized_dataset = dataset.map(lambda batch: summarize_text(batch, summarizer, tokenizer), batched=True, batch_size=8)
 
-        result = nlp_processor.process(query, texts)
-        
-        final_response = result['answer']
-        final_response = remove_redundant_sentences(final_response)
-        final_response = remove_exact_duplicates(final_response)
-        print_cleaned_text(final_response)
-        
-        db_handler.store_data({'query': query, 'response': final_response})
-        db_handler.save_metrics(query=query, num_results=num_results, total_text_length=total_text_length, 
-                                total_summary_length=len(result['summary']), processing_time=processing_time, 
-                                metric_name='', metric_value=0)
-        
-        logging.info(f"Summary Length: {len(result['summary'])}")
-        logging.info(f"Text Length: {total_text_length}")
-        logging.info(f"Processing Time: {processing_time:.2f} seconds")
+        valid_summaries = [s for s in summarized_dataset['summary'] if s]
+
+        if valid_summaries:
+            combined_summary = ' '.join(valid_summaries)
+            condensed_summary = condense_summary(combined_summary)
+            cleaned_summary = remove_redundant_sentences(condensed_summary)
+            cleaned_summary = remove_exact_duplicates(cleaned_summary)  # Ensuring exact duplicates are removed
+            final_response = nlp_processor.generate_response(cleaned_summary)
+            final_response = remove_exact_duplicates(final_response)
+            print_cleaned_text(final_response)
+            
+            total_summary_length = sum(len(s) for s in valid_summaries)
+            db_handler.store_data({'query': query, 'response': final_response})
+            db_handler.save_metrics(query=query, num_results=num_results, total_text_length=total_text_length, 
+                                    total_summary_length=total_summary_length, processing_time=processing_time, 
+                                    metric_name='', metric_value=0)
+            
+            logging.info(f"Summary Length: {total_summary_length}")
+            logging.info(f"Text Length: {total_text_length}")
+            logging.info(f"Processing Time: {processing_time:.2f} seconds")
+        else:
+            print_cleaned_text("I'm sorry, but I couldn't extract any meaningful information from the search results. This could be due to network issues or the complexity of the question. Please try again or rephrase your question.")
     except Exception as e:
         logging.error(f"Error during processing: {str(e)}")
         print_cleaned_text(f"An error occurred while processing your request: {str(e)}")

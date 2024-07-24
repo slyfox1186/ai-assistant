@@ -5,10 +5,10 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-from advanced_nlp_processor import AdvancedNLPProcessor
+from nlp_processor import process_nlp
 from web_scraper import WebScraper
 from fact_checker import FactChecker
-from data_analyzer import DataAnalyzer
+from data_analyzer import analyze_data
 from database_handler import DatabaseHandler
 
 logging.basicConfig(level=logging.INFO)
@@ -19,9 +19,7 @@ limiter = Limiter(app, key_func=get_remote_address)
 
 db_handler = DatabaseHandler()
 scraper = WebScraper()
-fact_checker = FactChecker(db_handler)
-data_analyzer = DataAnalyzer('ai_assistant.db')
-nlp_processor = AdvancedNLPProcessor()
+fact_checker = FactChecker()
 
 @app.route('/query', methods=['POST'])
 @limiter.limit("5 per minute")
@@ -45,7 +43,7 @@ def query():
         
         # Analyze data
         logging.info("Analyzing data...")
-        analyzed_data = data_analyzer.analyze_data(scraped_data)
+        analyzed_data = analyze_data(scraped_data, user_query)
         
         # Fact-check data
         logging.info("Fact-checking data...")
@@ -53,20 +51,13 @@ def query():
         
         # Process NLP
         logging.info("Processing NLP...")
-        texts = [item['content'] for item in checked_data if isinstance(item.get('content'), str)]
-        result = nlp_processor.process(user_query, texts)
+        response = process_nlp(checked_data, user_query)
         
         # Store in database
         logging.info("Storing data in database...")
-        db_handler.store_data({'query': user_query, 'response': result['answer']})
+        db_handler.store_data({'query': user_query, 'response': response})
         
-        return jsonify({
-            'query': user_query,
-            'response': result['answer'],
-            'summary': result['summary'],
-            'entities': result['entities'],
-            'key_information': result['key_information']
-        })
+        return jsonify({'query': user_query, 'response': response})
     except Exception as e:
         logging.error(f"Error processing query: {e}")
         return jsonify({'error': str(e)}), 500
