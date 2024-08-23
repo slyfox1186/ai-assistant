@@ -42,7 +42,7 @@ This project is an advanced Natural Language Processing (NLP) suite designed to 
 
 2. Create and activate a Conda environment:
     ```sh
-    conda create --name ai_assistant python=3.8
+    conda create --name ai_assistant python=3.12.2
     conda activate ai_assistant
     ```
 
