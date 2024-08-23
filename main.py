@@ -30,7 +30,7 @@ file_handler.setFormatter(logging.Formatter('%(levelname)s - %(message)s'))
 logger.addHandler(file_handler)
 
 # Hardcoded OpenAI API Key
-OPENAI_API_KEY = 'ENTER YOUR OPENAI API KEY HERE OR ENTER IT IN THE GUI BEFORE EXECUTING A SEARCH'
+# OPENAI_API_KEY = 'ENTER YOUR OPENAI API KEY HERE OR ENTER IT IN THE GUI BEFORE EXECUTING A SEARCH'
 set_openai_api_key(OPENAI_API_KEY)
 
 def delete_interaction_files():
