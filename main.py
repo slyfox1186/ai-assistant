@@ -12,10 +12,9 @@ import traceback
 
 from config import OPENAI_API_KEY as DEFAULT_API_KEY
 from data_manager import save_interaction, load_interactions, clear_all_interactions
-from data_manager import save_interaction, load_interactions, clear_all_interactions
 from model_trainer import train_models
 from ner_processor import NERProcessor
-from openai_handler import get_openai_response, set_openai_api_key
+from openai_handler import set_openai_api_key, get_openai_response
 from similarity_checker import find_similar_interaction
 from web_scraper import WebScraper
 
@@ -28,10 +27,6 @@ file_handler = logging.FileHandler('debug.log')
 file_handler.setLevel(logging.DEBUG)
 file_handler.setFormatter(logging.Formatter('%(levelname)s - %(message)s'))
 logger.addHandler(file_handler)
-
-# Hardcoded OpenAI API Key
-OPENAI_API_KEY = '' # ENTER YOUR OPENAI API KEY HERE OR ENTER IT IN THE GUI BEFORE EXECUTING A SEARCH
-set_openai_api_key(OPENAI_API_KEY)
 
 def delete_interaction_files():
     logger.debug("Entering delete_interaction_files()")
@@ -73,7 +68,7 @@ def run_training(iterations):
     st.session_state.train_models_toggle = False  # Ensure toggle is disabled after training
 
 async def search_internet_and_process(query):
-    scraper = WebScraper(api_key=OPENAI_API_KEY)
+    scraper = WebScraper(api_key=st.session_state.openai_api_key)
     comprehensive_answer = await scraper.scrape(query)
     logger.debug(f"Scraped data: {comprehensive_answer}")
     return comprehensive_answer
@@ -96,6 +91,8 @@ def main():
         st.session_state.training_completed = False
     if 'train_iterations' not in st.session_state:
         st.session_state.train_iterations = 1
+    if 'openai_api_key' not in st.session_state:
+        st.session_state.openai_api_key = DEFAULT_API_KEY
 
     logger.debug(f"Current session state: {st.session_state}")
 
@@ -164,11 +161,20 @@ def main():
     search_internet = col2.checkbox("Search Internet", value=st.session_state.search_internet, on_change=toggle_internet)
 
     # OpenAI API Key input
-    openai_api_key = st.sidebar.text_input("OpenAI API Key (optional)", type="password")
+    openai_api_key = st.sidebar.text_input("OpenAI API Key (required)", type="password")
     if openai_api_key:
-        set_openai_api_key(openai_api_key)
-    else:
-        set_openai_api_key(DEFAULT_API_KEY)
+        st.session_state.openai_api_key = openai_api_key
+    elif 'openai_api_key' not in st.session_state or not st.session_state.openai_api_key:
+        st.session_state.openai_api_key = DEFAULT_API_KEY
+
+    # Set the API key and log it (be careful with logging API keys in production)
+    set_openai_api_key(st.session_state.openai_api_key)
+    logger.debug(f"Using OpenAI API key: {st.session_state.openai_api_key[:5]}...{st.session_state.openai_api_key[-5:]}")
+
+    # Check if API key is provided
+    if not st.session_state.openai_api_key:
+        st.error("Please enter your OpenAI API key in the sidebar to use the OpenAI features.")
+        return
 
     # Main chat interface
     if "messages" not in st.session_state:
@@ -188,6 +194,7 @@ def main():
             with st.spinner("Thinking..."):
                 try:
                     logger.debug(f"Processing user query: {prompt}")
+                    logger.debug(f"Current OpenAI API key: {st.session_state.openai_api_key[:5]}...{st.session_state.openai_api_key[-5:]}")
 
                     if use_local_cache:
                         interactions = load_interactions()
@@ -213,6 +220,7 @@ def main():
                             response = "[Web]\nI couldn't find any relevant information on the internet."
                             logger.debug("No relevant information found on the internet")
                     elif use_openai:
+                        logger.debug("Attempting to get OpenAI response")
                         openai_response = asyncio.run(get_openai_response(prompt))
                         response = "[OpenAI]\n" + openai_response
                         logger.debug(f"OpenAI response: {response}")
@@ -229,7 +237,7 @@ def main():
                 except Exception as e:
                     logger.error(f"Error processing query: {str(e)}")
                     logger.error(traceback.format_exc())
-                    st.error("An error occurred while processing your query. Please try again.")
+                    st.error(f"An error occurred while processing your query: {str(e)}")
 
     logger.debug(f"Final session state: {st.session_state}")
     logger.debug("Exiting main()")

@@ -2,6 +2,9 @@
 
 import os
 
+# OpenAI API Configuration
+OPENAI_API_KEY = "your_api_key_here"
+
 # Directory Configurations
 INTERACTIONS_DIR = 'interactions'
 HF_CACHE_DIR = '/home/jman/.cache/huggingface'
