@@ -1,0 +1,11 @@
+{
+  "query": "Who is Mickey Mantle?",
+  "answer": "[Web]\nMickey Mantle (October 20, 1931 \u2013 August 13, 1995) was an iconic American professional baseball player who spent his entire 18-year Major League Baseball (MLB) career with the New York Yankees (1951\u20131968). Often referred to by his nicknames \"The Mick\" and \"The Commerce Comet,\" Mantle is widely regarded as one of the greatest baseball players of all time, particularly known for his exceptional hitting ability as a switch-hitter.\n\nBorn in Spavinaw, Oklahoma, Mantle was raised in Commerce, where he was trained by his father to become a baseball player. He made his MLB debut in 1951, stepping into the spotlight as a center fielder, a position he held for most of his career. Despite facing numerous injuries, including a severe knee injury during his rookie season, Mantle's talent shone through. He became a formidable offensive force, hitting 536 home runs and maintaining a .298 batting average over his career.\n\nMantle's achievements include winning the American League (AL) Most Valuable Player (MVP) award three times and earning a spot in 20 All-Star Games. He notably won the AL Triple Crown in 1956, leading the league with a .353 batting average, 52 home runs, and 130 RBIs. Throughout his time with the Yankees, Mantle helped the team secure seven World Series championships and set several records, including hitting 18 home runs in World Series play, which remains a record today.\n\nAfter retiring in 1968, Mantle briefly served as a coach and commentator before facing personal challenges, including battles with alcoholism. He underwent treatment and became an advocate for organ donation after receiving a liver transplant in 1995. Mantle passed away later that year due to complications from liver cancer.\n\nIn recognition of his contributions to baseball, Mantle was inducted into the National Baseball Hall of Fame in 1974. His legacy endures, and he is celebrated not only for his on-field accomplishments but also for his impact on the game and American culture. Mantle remains a beloved figure in baseball history, remembered as one of the greatest switch hitters and a true sports legend.",
+  "ner_labels": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "similarity_label": 0.4415596161339955
+}

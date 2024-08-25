@@ -10,7 +10,7 @@ import pickle
 import sys
 from asyncio import Semaphore
 from concurrent.futures import ThreadPoolExecutor
-from config import INTERACTIONS_DIR, DATABASE_URL, MAX_WORKERS, CHUNK_SIZE, NER_CONFIDENCE_THRESHOLD
+from config import INTERACTIONS_DIR, DATABASE_URL, MAX_WORKERS, CHUNK_SIZE, NER_CONFIDENCE_THRESHOLD, NUM_BEAMS
 from contextlib import contextmanager
 from ner_processor import NERProcessor, ner_model_name, sentiment_model_name, flair_model_name, spacy_model_name
 from similarity_utils import compute_similarity
@@ -67,7 +67,8 @@ class DataManager:
             ner_model_name=ner_model_name,
             sentiment_model_name=sentiment_model_name,
             flair_model_name=flair_model_name,
-            spacy_model_name=spacy_model_name
+            spacy_model_name=spacy_model_name,
+            num_beams=NUM_BEAMS  # Pass the num_beams configuration here
         )
 
     async def save_interaction(self, query: str, answer: str, meta_data: Optional[Dict] = None) -> None:
@@ -154,16 +155,16 @@ class DataManager:
         save_tasks = [self.save_interaction(i['query'], i['answer']) for i in interactions]
         await asyncio.gather(*save_tasks)
 
-    def export_to_csv(self, filename: str) -> None:
-        interactions = asyncio.run(self.load_interactions())
+    async def export_to_csv(self, filename: str) -> None:
+        interactions = await self.load_interactions()
         df = pd.DataFrame(interactions)
         df.to_csv(filename, index=False)
         logger.info(f"Interactions exported to CSV: {filename}")
 
-    def import_from_csv(self, filename: str) -> None:
+    async def import_from_csv(self, filename: str) -> None:
         df = pd.read_csv(filename)
         interactions = df.to_dict('records')
-        asyncio.run(self.batch_save_interactions(interactions))
+        await self.batch_save_interactions(interactions)
         logger.info(f"Interactions imported from CSV: {filename}")
 
     def delete_interaction(self, interaction_id: int) -> None:
@@ -301,24 +302,40 @@ class DataManager:
                 except Exception as e:
                     logger.error(f"Error converting {filename}: {e}")
 
+    def clear_interaction_files(self) -> None:
+        try:
+            for filename in os.listdir(INTERACTIONS_DIR):
+                if filename.startswith("interaction_") and filename.endswith(".json"):
+                    os.remove(os.path.join(INTERACTIONS_DIR, filename))
+            logger.info("Interaction files cleared.")
+        except Exception as e:
+            logger.error(f"Error clearing interaction files: {str(e)}")
+
 data_manager = DataManager()
 
+# Exposed asynchronous functions
+async def save_interaction(query: str, answer: str) -> None:
+    await data_manager.save_interaction(query, answer)
+
+async def load_interactions() -> List[Dict[str, Union[str, Dict]]]:
+    return await data_manager.load_interactions()
+
+async def batch_save_interactions(interactions: List[Dict[str, Union[str, Dict]]]) -> None:
+    await data_manager.batch_save_interactions(interactions)
+
+async def export_to_csv(filename: str) -> None:
+    await data_manager.export_to_csv(filename)
+
+async def import_from_csv(filename: str) -> None:
+    await data_manager.import_from_csv(filename)
+
+async def process_interactions_in_chunks(processor_func, chunk_size: int = CHUNK_SIZE):
+    await data_manager.process_interactions_in_chunks(processor_func, chunk_size)
+
+async def convert_existing_interactions():
+    await data_manager.convert_existing_interactions()
+
 # Exposed synchronous functions
-def save_interaction(query: str, answer: str) -> None:
-    asyncio.run(data_manager.save_interaction(query, answer))
-
-def load_interactions() -> List[Dict[str, Union[str, Dict]]]:
-    return asyncio.run(data_manager.load_interactions())
-
-def batch_save_interactions(interactions: List[Dict[str, Union[str, Dict]]]) -> None:
-    asyncio.run(data_manager.batch_save_interactions(interactions))
-
-def export_to_csv(filename: str) -> None:
-    data_manager.export_to_csv(filename)
-
-def import_from_csv(filename: str) -> None:
-    data_manager.import_from_csv(filename)
-
 def delete_interaction(interaction_id: int) -> None:
     data_manager.delete_interaction(interaction_id)
 
@@ -335,17 +352,11 @@ def get_interaction_count() -> int:
 def clear_all_interactions() -> None:
     data_manager.clear_all_interactions()
 
-async def process_interactions_in_chunks(processor_func, chunk_size: int = CHUNK_SIZE):
-    await data_manager.process_interactions_in_chunks(processor_func, chunk_size)
-
 def save_model_to_database(model_name: str, model_state: dict, tokenizer_state: dict):
     data_manager.save_model_to_database(model_name, model_state, tokenizer_state)
 
 def load_model_from_database(model_name: str):
     return data_manager.load_model_from_database(model_name)
-
-def convert_existing_interactions():
-    asyncio.run(data_manager.convert_existing_interactions())
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:

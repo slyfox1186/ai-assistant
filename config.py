@@ -3,7 +3,7 @@
 import os
 
 # OpenAI API Configuration
-OPENAI_API_KEY = "your_api_key_here"
+OPENAI_API_KEY = ""
 
 # Directory Configurations
 INTERACTIONS_DIR = 'interactions'
@@ -11,11 +11,15 @@ HF_CACHE_DIR = '/home/jman/.cache/huggingface'
 NER_MODEL_PATH = os.path.join(HF_CACHE_DIR, 'ner_model')
 SIMILARITY_MODEL_PATH = os.path.join(HF_CACHE_DIR, 'similarity_model')
 
+# Set up Hugging Face cache directory
+os.environ['HF_HOME'] = HF_CACHE_DIR
+os.environ['TRANSFORMERS_CACHE'] = HF_CACHE_DIR
+
 # Model Training Configurations
 BATCH_SIZE = 32
-EVAL_BATCH_SIZE = 64
 EPOCHS = 3
-LEARNING_RATE = 2e-5
+EVAL_BATCH_SIZE = 64
+LEARNING_RATE = 5e-5
 
 # NER Model Configurations
 NER_MAX_LENGTH = 128
@@ -27,9 +31,6 @@ SIMILARITY_MAX_LENGTH = 512
 # Evaluation Configurations
 SIMILARITY_THRESHOLD = 0.7
 NER_CONFIDENCE_THRESHOLD = 0.9
-
-# Set up Hugging Face cache directory
-os.environ['HF_HOME'] = HF_CACHE_DIR
 
 # Streamlit Configurations
 STREAMLIT_SERVER_PORT = 8501
@@ -49,13 +50,14 @@ UPDATE_THRESHOLD = 100  # Number of new interactions before updating models
 MAX_RETRIES = 3
 
 # OpenAI API Parameters
-MAX_TOKENS = 150
-TEMPERATURE = 0.7
-TOP_P = 1.0
-FREQUENCY_PENALTY = 0.0
-PRESENCE_PENALTY = 0.0
 ENGINE = "gpt-4o-mini"
+FREQUENCY_PENALTY = 0.0
+MAX_TOKENS = 16384
+NUM_BEAMS = 15
+PRESENCE_PENALTY = 0.0
+TEMPERATURE = 0.7
 TIMEOUT = 30
+TOP_P = 1.0
 
 # Caching Configuration
 CACHE_SIZE = 1000

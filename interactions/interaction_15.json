@@ -1,0 +1,11 @@
+{
+  "query": "Who is Mickey Mantle?",
+  "answer": "[OpenAI]\nMickey Mantle was an American professional baseball player, widely regarded as one of the greatest switch-hitters in the history of Major League Baseball (MLB). He was born on October 20, 1931, in Spavinaw, Oklahoma, and passed away on August 13, 1995.\n\nMantle played his entire MLB career for the New York Yankees from 1951 to 1968. He was known for his incredible power, speed, and ability to hit for average, making him a key figure in the Yankees' dominance during the 1950s and 1960s. Mantle won seven World Series championships with the Yankees and was a 20-time All-Star. He was also awarded the American League Most Valuable Player (MVP) award three times (1956, 1957, and 1962).\n\nMantle's legacy includes his impressive statistics, which feature over 2,400 hits, 536 home runs, and a career batting average of .298. He was inducted into the National Baseball Hall of Fame in 1974. Mantle is remembered not only for his on-field accomplishments but also for his personality and charisma, making him an iconic figure in American sports history.",
+  "ner_labels": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "similarity_label": 0.4217789652211811
+}

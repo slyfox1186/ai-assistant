@@ -292,7 +292,7 @@
     "answer": "Yuri Gagarin was the first man to orbit the Earth.",
     "ner_labels": [0, 0, 0, 0, 1, 1, 0, 0, 0, 1],
     "similarity_label": 0.97
-  }
+  },
   {
     "query": "What is the tallest building in the world?",
     "answer": "The Burj Khalifa in Dubai is the tallest building in the world.",

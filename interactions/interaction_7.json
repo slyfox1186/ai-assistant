@@ -1,0 +1,8 @@
+{
+  "query": "Hi",
+  "answer": "[OpenAI]\nHello! How can I assist you today?",
+  "ner_labels": [
+    0
+  ],
+  "similarity_label": 0.20457318425178528
+}
