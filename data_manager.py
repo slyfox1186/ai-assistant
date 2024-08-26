@@ -19,6 +19,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, scoped_session
 from typing import List, Dict, Union, Optional
+from functools import lru_cache
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -68,8 +69,9 @@ class DataManager:
             sentiment_model_name=sentiment_model_name,
             flair_model_name=flair_model_name,
             spacy_model_name=spacy_model_name,
-            num_beams=NUM_BEAMS  # Pass the num_beams configuration here
+            num_beams=NUM_BEAMS
         )
+        self.interaction_cache = {}
 
     async def save_interaction(self, query: str, answer: str, meta_data: Optional[Dict] = None) -> None:
         async with self.semaphore:
@@ -113,10 +115,13 @@ class DataManager:
             db_interaction = Interaction(**interaction)
             session.add(db_interaction)
 
+    @lru_cache(maxsize=1000)
     async def load_interactions(self) -> List[Dict[str, Union[str, Dict]]]:
         async with self.semaphore:
-            file_interactions = await self._load_from_files()
-            db_interactions = await asyncio.get_event_loop().run_in_executor(self.executor, self._load_from_db)
+            file_interactions, db_interactions = await asyncio.gather(
+                self._load_from_files(),
+                asyncio.get_event_loop().run_in_executor(self.executor, self._load_from_db)
+            )
             return file_interactions + db_interactions
 
     async def _load_from_files(self) -> List[Dict[str, Union[str, Dict]]]:
@@ -128,8 +133,7 @@ class DataManager:
                 async with aiofiles.open(f"{INTERACTIONS_DIR}/{filename}", "r") as f:
                     return json.loads(await f.read())
             
-            tasks = [asyncio.create_task(read_file(filename)) for filename in filenames]
-            interactions = await asyncio.gather(*tasks)
+            interactions = await asyncio.gather(*[read_file(filename) for filename in filenames])
             
             logger.info(f"Loaded {len(interactions)} interactions from files")
         except Exception as e:
@@ -152,8 +156,23 @@ class DataManager:
             return interactions
 
     async def batch_save_interactions(self, interactions: List[Dict[str, Union[str, Dict]]]) -> None:
-        save_tasks = [self.save_interaction(i['query'], i['answer']) for i in interactions]
-        await asyncio.gather(*save_tasks)
+        async with self.semaphore:
+            try:
+                with session_scope() as session:
+                    db_interactions = [Interaction(**i) for i in interactions]
+                    session.bulk_save_objects(db_interactions)
+                logger.info(f"Bulk saved {len(interactions)} interactions to database")
+
+                save_tasks = [self._save_to_file(i) for i in interactions]
+                await asyncio.gather(*save_tasks)
+                logger.info(f"Saved {len(interactions)} interactions to files")
+            except Exception as e:
+                logger.error(f"Error in batch save: {e}")
+
+    async def _save_to_file(self, interaction: Dict[str, Union[str, Dict]]) -> None:
+        filename = f"{INTERACTIONS_DIR}/interaction_{len(os.listdir(INTERACTIONS_DIR)) + 1}.json"
+        async with aiofiles.open(filename, "w") as f:
+            await f.write(json.dumps(interaction, indent=2))
 
     async def export_to_csv(self, filename: str) -> None:
         interactions = await self.load_interactions()
@@ -199,6 +218,7 @@ class DataManager:
         except Exception as e:
             logger.error(f"Error updating interaction: {e}")
 
+    @lru_cache(maxsize=1000)
     def search_interactions(self, query: str) -> List[Dict[str, Union[str, Dict]]]:
         try:
             with session_scope() as session:
@@ -217,6 +237,7 @@ class DataManager:
             logger.error(f"Error searching interactions: {e}")
             return []
 
+    @lru_cache(maxsize=1)
     def get_interaction_count(self) -> int:
         try:
             with session_scope() as session:
@@ -264,6 +285,7 @@ class DataManager:
                 session.add(new_model)
                 logger.info(f"Model {model_name} saved to the database.")
 
+    @lru_cache(maxsize=10)
     def load_model_from_database(self, model_name: str):
         try:
             with session_scope() as session:
@@ -281,26 +303,29 @@ class DataManager:
             return None
 
     async def convert_existing_interactions(self):
-        for filename in os.listdir(INTERACTIONS_DIR):
-            if filename.startswith("interaction_") and filename.endswith(".json"):
-                filepath = os.path.join(INTERACTIONS_DIR, filename)
-                try:
-                    async with aiofiles.open(filepath, "r") as f:
-                        data = json.loads(await f.read())
-                    
-                    new_data = {
-                        "query": data["query"],
-                        "answer": data["answer"],
-                        "ner_labels": data.get("ner_labels", []),
-                        "similarity_label": data.get("similarity_label", 0.0)
-                    }
-                    
-                    async with aiofiles.open(filepath, "w") as f:
-                        await f.write(json.dumps(new_data, indent=2))
-                    
-                    logger.info(f"Converted {filename} to new format")
-                except Exception as e:
-                    logger.error(f"Error converting {filename}: {e}")
+        filenames = [f for f in os.listdir(INTERACTIONS_DIR) if f.startswith("interaction_") and f.endswith(".json")]
+        
+        async def convert_file(filename):
+            filepath = os.path.join(INTERACTIONS_DIR, filename)
+            try:
+                async with aiofiles.open(filepath, "r") as f:
+                    data = json.loads(await f.read())
+                
+                new_data = {
+                    "query": data["query"],
+                    "answer": data["answer"],
+                    "ner_labels": data.get("ner_labels", []),
+                    "similarity_label": data.get("similarity_label", 0.0)
+                }
+                
+                async with aiofiles.open(filepath, "w") as f:
+                    await f.write(json.dumps(new_data, indent=2))
+                
+                logger.info(f"Converted {filename} to new format")
+            except Exception as e:
+                logger.error(f"Error converting {filename}: {e}")
+
+        await asyncio.gather(*[convert_file(filename) for filename in filenames])
 
     def clear_interaction_files(self) -> None:
         try:
@@ -367,12 +392,12 @@ if __name__ == "__main__":
     answer = sys.argv[2] if len(sys.argv) > 2 else None
 
     if answer:
-        save_interaction(query, answer)
+        asyncio.run(save_interaction(query, answer))
         print(f"Interaction saved: Query: '{query}' -> Answer: '{answer}'")
     else:
         print(f"Only query provided: '{query}'. No answer to save.")
 
-    interactions = load_interactions()
+    interactions = asyncio.run(load_interactions())
     print(f"Number of interactions: {len(interactions)}")
 
     dummy_model_state = {"layers": [1, 2, 3]}
@@ -389,7 +414,7 @@ if __name__ == "__main__":
         print(f"Failed to load model '{model_name}'.")
 
     # Convert existing interactions to the new format
-    convert_existing_interactions()
+    asyncio.run(convert_existing_interactions())
     print("Existing interactions converted to new format.")
 
 # Export the necessary functions

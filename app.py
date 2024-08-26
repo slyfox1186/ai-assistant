@@ -5,6 +5,7 @@ import logging
 import os
 import streamlit as st
 import traceback
+import re
 from typing import List, Dict
 from streamlit.runtime.scriptrunner import add_script_run_ctx
 from researcher import Researcher
@@ -61,6 +62,16 @@ def handle_training_result(future):
     st.session_state.is_training = False
     st.session_state.train_models_toggle = False
 
+def format_response(response: str) -> str:
+    # Format headers
+    response = re.sub(r'## (.*)', r'<h2 style="color: #4CAF50; font-weight: bold;">\1</h2>', response)
+    response = re.sub(r'# (.*)', r'<h1 style="color: #FFFFE0;">\1</h1>', response)
+    
+    # Format bold text (assuming it's used for sub-headers or important points)
+    response = re.sub(r'\*\*(.*?)\*\*', r'<span style="color: #4CAF50; font-weight: bold;">\1</span>', response)
+    
+    return response
+
 async def main():
     logger.debug("Entering main()")
     st.set_page_config(page_title="AI Assistant", page_icon="🤖", layout="wide")
@@ -84,9 +95,7 @@ async def main():
     if 'research_topic' not in st.session_state:
         st.session_state.research_topic = False
     if 'research_iterations' not in st.session_state:
-        st.session_state.research_iterations = 3  # Default value
-    if 'research_results' not in st.session_state:
-        st.session_state.research_results = []
+        st.session_state.research_iterations = 2  # Default value
 
     logger.debug(f"Current session state: {st.session_state}")
 
@@ -192,105 +201,19 @@ async def main():
         )
         st.session_state.research_iterations = research_iterations
 
-        research_query = st.sidebar.text_input("Research Query")
-        if st.sidebar.button("Start Research"):
-            if research_query:
-                with st.spinner("Researching..."):
-                    logger.debug(f"Starting research for query: {research_query}")
-                    
-                    researcher = Researcher()
-                    research_results = await researcher.research_topic(research_query, research_iterations)
-                    
-                    logger.debug(f"Type of research_results: {type(research_results)}, Content: {research_results}")
-
-                    if research_results:
-                        # Filter out uninformative results
-                        filtered_results = [
-                            result for result in research_results
-                            if not result['summary'].startswith("I'm sorry, but I couldn't find any")
-                            and not result['summary'].startswith("I'm sorry, but I couldn't find any relevant information")
-                        ]
-                        
-                        if filtered_results:
-                            final_summary = await researcher.generate_final_summary(research_query, filtered_results)
-                            formatted_results = researcher.format_research_results(filtered_results, final_summary)
-                            
-                            # Add new results
-                            st.session_state.research_results.append({"query": research_query, "results": formatted_results})
-                            
-                            # Save the interaction
-                            await save_interaction(research_query, formatted_results)
-
-                            logger.debug("Research completed and results saved")
-                        else:
-                            st.sidebar.warning("No informative research results found.")
-                    else:
-                        st.sidebar.warning("No research results found.")
-            else:
-                logger.warning("Research query not provided")
-                st.sidebar.warning("Please enter a research query.")
-
-        # Display all research results
-        for idx, result in enumerate(st.session_state.research_results):
-            st.subheader(f"Research Query {idx+1}: {result['query']}")
-            st.markdown(result['results'])
-            st.markdown("---")  # Add a separator between results
-
     # Main chat interface
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
-    # Style enhancements to improve readability and contrast
-    st.markdown("""
-    <style>
-        .summary-text {
-            font-size: 14px;
-            line-height: 1.5;
-            padding: 10px;
-            background-color: #1e1e1e;
-            color: #e0e0e0;
-            border-radius: 10px;
-            border: 1px solid #555;
-            overflow-wrap: break-word;
-            word-wrap: break-word;
-            word-break: break-word;
-        }
-        .summary {
-            font-weight: bold;
-            font-size: 14px;
-            line-height: 1.5;
-            margin-top: 10px;
-            margin-bottom: 10px;
-        }
-        h1 {
-            font-size: 20px;
-            font-weight: bold;
-            margin-top: 20px;
-            margin-bottom: 10px;
-            color: #FF9C00;
-        }
-        h2 {
-            font-size: 16px;
-            font-weight: bold;
-            margin-top: 20px;
-            margin-bottom: 10px;
-            color: #4CAF50;
-        }
-        strong {
-            font-weight: normal;
-        }
-    </style>
-    """, unsafe_allow_html=True)
-
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
-            st.markdown(f"<div class='summary-text'>{message['content']}</div>", unsafe_allow_html=True)
+            st.markdown(message["content"], unsafe_allow_html=True)
 
     if prompt := st.chat_input("What is your question?"):
         logger.debug(f"Received user prompt: {prompt}")
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
-            st.markdown(f"<div class='summary-text'>{prompt}</div>", unsafe_allow_html=True)
+            st.markdown(prompt)
 
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
@@ -314,10 +237,6 @@ async def main():
                         logger.debug(f"Internet search result: {scraped_data}")
                         response = "[Web]\n" + scraped_data['answer']
                         logger.debug(f"Generated response: {response}")
-
-                        # Save the interaction
-                        await save_interaction(prompt, response)
-
                     elif research_topic_toggle:
                         logger.debug(f"Researching topic: {prompt}")
                         researcher = Researcher()
@@ -326,11 +245,20 @@ async def main():
                         logger.debug(f"Type of research_results: {type(research_results)}, Content: {research_results}")
 
                         if research_results:
-                            final_summary = await researcher.generate_final_summary(prompt, research_results)
-                            response = researcher.format_research_results(research_results, final_summary)
-
-                            # Save the interaction
-                            await save_interaction(prompt, response)
+                            filtered_results = [
+                                result for result in research_results
+                                if not result['summary'].startswith("I'm sorry, but I couldn't find any")
+                                and not result['summary'].startswith("I'm sorry, but I couldn't find any relevant information")
+                            ]
+                            
+                            if filtered_results:
+                                final_summary = await researcher.generate_final_summary(prompt, filtered_results)
+                                response = "# Research Results\n\n"
+                                for idx, result in enumerate(filtered_results, 1):
+                                    response += f"## Research Result {idx}\n\n{result['summary']}\n\n"
+                                response += f"# Final Summary\n\n{final_summary}"
+                            else:
+                                response = "No informative research results found."
                         else:
                             response = get_fallback_response()
                         logger.debug(f"Research results: {response}")
@@ -339,38 +267,20 @@ async def main():
                         openai_response = await get_openai_response(prompt)
                         response = "[OpenAI]\n" + openai_response
                         logger.debug(f"OpenAI response: {response}")
-
-                        # Save the interaction
-                        await save_interaction(prompt, response)
-
                     else:
                         response = "Please enable either OpenAI, Internet Search, or Research Topic to get an answer."
                         logger.debug("No response generated: No option selected")
 
                     if filter_irrelevant_responses(response):
-                        # Check if the response contains a summary section
-                        if "In summary," in response:
-                            parts = response.split("In summary,", 1)
-                            main_text = parts[0]
-                            summary = "In summary," + parts[1]
-                            
-                            # Display the main text
-                            st.markdown(f"<div class='summary-text'>{main_text}</div>", unsafe_allow_html=True)
-                            
-                            # Display the summary with consistent formatting
-                            st.markdown(f"<div class='summary-text'><p class='summary'>{summary}</p></div>", unsafe_allow_html=True)
-                        else:
-                            # If there's no summary, display the whole response as before
-                            st.markdown(f"<div class='summary-text'>{response}</div>", unsafe_allow_html=True)
-                        
-                        st.session_state.messages.append({"role": "assistant", "content": response})
+                        formatted_response = format_response(response)
+                        st.markdown(formatted_response, unsafe_allow_html=True)
+                        st.session_state.messages.append({"role": "assistant", "content": formatted_response})
                     else:
                         logger.debug("Filtered out an irrelevant response.")
+                        st.warning("I couldn't find a relevant answer to your query. Please try rephrasing or asking a different question.")
 
-                    # Update the formatting for the "Final Summary:" header
-                    if "Final Summary:" in response:
-                        response = response.replace("Final Summary:", "<h3>Final Summary:</h3>")
-                        st.markdown(response, unsafe_allow_html=True)
+                    # Save the interaction
+                    await save_interaction(prompt, response)
 
                 except Exception as e:
                     logger.error(f"Error processing query: {str(e)}")

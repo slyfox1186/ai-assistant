@@ -7,13 +7,14 @@ import os
 import torch
 import asyncio
 import traceback
-from multiprocessing import cpu_count
+from multiprocessing import Pool, cpu_count
 from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset, DataLoader
 from transformers import AutoTokenizer, AutoModelForTokenClassification, AutoModel, get_linear_schedule_with_warmup
 from typing import List, Dict, Tuple, Union, Optional
 from torch.amp import autocast, GradScaler
 from torch.optim import AdamW
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 from config import (
     HF_CACHE_DIR, NER_MODEL_PATH, SIMILARITY_MODEL_PATH, BATCH_SIZE,
@@ -121,13 +122,11 @@ def load_training_data(file_path):
         try:
             with open(TRAINING_DATA_FILE, 'r') as f:
                 content = f.read()
-            # Remove the problematic character identified
             problematic_index = e.pos
             fixed_content = content[:problematic_index] + content[problematic_index+1:]
             fixed_data = json.loads(fixed_content)
             logger.info("Successfully fixed and loaded the JSON file")
             
-            # Save the fixed JSON back to the file
             with open(TRAINING_DATA_FILE, 'w') as f:
                 json.dump(fixed_data, f, indent=2)
             logger.info("Fixed JSON has been saved back to the file")
@@ -139,6 +138,16 @@ def load_training_data(file_path):
     except Exception as e:
         logger.error(f"Error loading training data from {TRAINING_DATA_FILE}: {str(e)}")
         return []
+
+def preprocess_data(data):
+    # Implement your preprocessing logic here
+    return data
+
+def parallel_preprocess(data, num_processes):
+    chunk_size = len(data) // num_processes
+    with Pool(processes=num_processes) as pool:
+        processed_data = pool.map(preprocess_data, [data[i:i+chunk_size] for i in range(0, len(data), chunk_size)])
+    return [item for sublist in processed_data for item in sublist]
 
 async def train_ner_model(interactions: List[Dict[str, str]], max_epochs: int) -> Tuple[Optional[AutoModelForTokenClassification], Optional[AutoTokenizer]]:
     logger.info("Starting NER model training")
@@ -155,7 +164,11 @@ async def train_ner_model(interactions: List[Dict[str, str]], max_epochs: int) -
         logger.warning("No valid interactions with 'ner_labels' found. Skipping NER model training.")
         return None, None
 
-    train_data, val_data = train_test_split(valid_interactions, test_size=0.2, random_state=42)
+    # Use multiprocessing for data preprocessing
+    num_processes = cpu_count()
+    preprocessed_interactions = parallel_preprocess(valid_interactions, num_processes)
+
+    train_data, val_data = train_test_split(preprocessed_interactions, test_size=0.2, random_state=42)
     logger.debug(f"Training data size: {len(train_data)}, Validation data size: {len(val_data)}")
 
     tokenizer = AutoTokenizer.from_pretrained('bert-base-cased', clean_up_tokenization_spaces=True)
@@ -173,6 +186,7 @@ async def train_ner_model(interactions: List[Dict[str, str]], max_epochs: int) -
     optimizer = AdamW(model.parameters(), lr=LEARNING_RATE)
     total_steps = len(train_dataloader) * max_epochs
     scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=0, num_training_steps=total_steps)
+    lr_scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3, verbose=True)
     scaler = GradScaler()
 
     best_val_loss = float('inf')
@@ -229,6 +243,8 @@ async def train_ner_model(interactions: List[Dict[str, str]], max_epochs: int) -
         avg_val_loss = total_val_loss / len(val_dataloader)
         logger.info(f"Epoch {epoch+1}/{max_epochs}, Validation Loss: {avg_val_loss:.4f}")
 
+        lr_scheduler.step(avg_val_loss)
+
         if best_val_loss - avg_val_loss > min_delta:
             best_val_loss = avg_val_loss
             patience_counter = 0
@@ -273,7 +289,11 @@ async def train_similarity_model(interactions: List[Dict[str, str]], max_epochs:
         logger.warning("No valid interactions with 'similarity_label' found. Skipping similarity model training.")
         return None, None
 
-    train_data, val_data = train_test_split(valid_interactions, test_size=0.2, random_state=42)
+    # Use multiprocessing for data preprocessing
+    num_processes = cpu_count()
+    preprocessed_interactions = parallel_preprocess(valid_interactions, num_processes)
+
+    train_data, val_data = train_test_split(preprocessed_interactions, test_size=0.2, random_state=42)
     logger.debug(f"Training data size: {len(train_data)}, Validation data size: {len(val_data)}")
 
     tokenizer = AutoTokenizer.from_pretrained('sentence-transformers/all-MiniLM-L6-v2')
@@ -291,6 +311,7 @@ async def train_similarity_model(interactions: List[Dict[str, str]], max_epochs:
     optimizer = AdamW(model.parameters(), lr=LEARNING_RATE)
     total_steps = len(train_dataloader) * EPOCHS
     scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=0, num_training_steps=total_steps)
+    lr_scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3, verbose=True)
     scaler = GradScaler()
 
     best_val_loss = float('inf')
@@ -348,6 +369,8 @@ async def train_similarity_model(interactions: List[Dict[str, str]], max_epochs:
         val_loss /= len(val_dataloader)
         logger.info(f"Epoch {epoch+1}/{max_epochs}, Validation Loss: {val_loss:.4f}")
 
+        lr_scheduler.step(val_loss)
+
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             patience_counter = 0
@@ -388,7 +411,6 @@ def save_models(ner_model, ner_tokenizer, similarity_model, similarity_tokenizer
 async def train_models(progress_callback=None):
     logger.info("Starting model training...")
     try:
-        # Ensure the correct file_path is passed
         file_path = "interactions/training_data.json"
         logger.info("Loading training data...")
         training_data = load_training_data(file_path)
@@ -396,7 +418,6 @@ async def train_models(progress_callback=None):
         
         max_epochs = 3  # Define the number of epochs
 
-        # Update progress after loading data
         if progress_callback:
             progress_callback(0.1)
 
@@ -404,7 +425,6 @@ async def train_models(progress_callback=None):
         ner_model, ner_tokenizer = await train_ner_model(training_data, max_epochs)
         logger.info("NER model training completed")
         
-        # Update progress after NER model training
         if progress_callback:
             progress_callback(0.5)
         
@@ -412,11 +432,9 @@ async def train_models(progress_callback=None):
         similarity_model, similarity_tokenizer = await train_similarity_model(training_data, max_epochs)
         logger.info("Similarity model training completed")
         
-        # Update progress after Similarity model training
         if progress_callback:
             progress_callback(0.8)
         
-        # Save the models if training is successful
         if ner_model and similarity_model:
             logger.info("Saving trained models...")
             save_models(ner_model, ner_tokenizer, similarity_model, similarity_tokenizer)
@@ -424,7 +442,6 @@ async def train_models(progress_callback=None):
         else:
             logger.warning("One or both models failed to train. Not saving models.")
         
-        # Final progress update
         if progress_callback:
             progress_callback(1.0)
         

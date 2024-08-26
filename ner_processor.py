@@ -7,6 +7,7 @@ import numpy as np
 import nltk
 import logging
 import asyncio
+from functools import lru_cache
 from transformers import AutoTokenizer, AutoModelForTokenClassification, AutoModelForSequenceClassification
 from flair.models import SequenceTagger
 from torch.utils.data import Dataset, DataLoader
@@ -50,20 +51,18 @@ class NERDataset(Dataset):
 
 class NERProcessor:
     def __init__(self, ner_model_name: str, sentiment_model_name: str, flair_model_name: str, spacy_model_name: str, num_beams: int):
-        # Load models dynamically based on user input or configuration
-        logger.info(f"Loading NER model: {ner_model_name}")
-        self.ner_tokenizer = AutoTokenizer.from_pretrained(ner_model_name, cache_dir=HF_CACHE_DIR)
-        self.ner_model = AutoModelForTokenClassification.from_pretrained(ner_model_name, cache_dir=HF_CACHE_DIR).to(device)
+        self.ner_model_name = ner_model_name
+        self.sentiment_model_name = sentiment_model_name
+        self.flair_model_name = flair_model_name
+        self.spacy_model_name = spacy_model_name
+        self.num_beams = num_beams
 
-        logger.info(f"Loading Sentiment model: {sentiment_model_name}")
-        self.sentiment_tokenizer = AutoTokenizer.from_pretrained(sentiment_model_name, cache_dir=HF_CACHE_DIR)
-        self.sentiment_model = AutoModelForSequenceClassification.from_pretrained(sentiment_model_name, cache_dir=HF_CACHE_DIR).to(device)
-
-        logger.info(f"Loading SpaCy model: {spacy_model_name}")
-        self.nlp = spacy.load(spacy_model_name)
-
-        logger.info(f"Loading Flair model: {flair_model_name}")
-        self.flair_ner = SequenceTagger.load(flair_model_name)
+        self.ner_tokenizer = None
+        self.ner_model = None
+        self.sentiment_tokenizer = None
+        self.sentiment_model = None
+        self.nlp = None
+        self.flair_ner = None
 
         # Initialize caches
         self.ner_cache = {}
@@ -72,9 +71,31 @@ class NERProcessor:
         self.entity_linking_cache = {}
 
         self.lemmatizer = nltk.WordNetLemmatizer()
-        self.num_beams = num_beams  # Set the number of beams for beam search
+
+    def load_ner_model(self):
+        if self.ner_model is None:
+            logger.info(f"Loading NER model: {self.ner_model_name}")
+            self.ner_tokenizer = AutoTokenizer.from_pretrained(self.ner_model_name, cache_dir=HF_CACHE_DIR)
+            self.ner_model = AutoModelForTokenClassification.from_pretrained(self.ner_model_name, cache_dir=HF_CACHE_DIR).to(device)
+
+    def load_sentiment_model(self):
+        if self.sentiment_model is None:
+            logger.info(f"Loading Sentiment model: {self.sentiment_model_name}")
+            self.sentiment_tokenizer = AutoTokenizer.from_pretrained(self.sentiment_model_name, cache_dir=HF_CACHE_DIR)
+            self.sentiment_model = AutoModelForSequenceClassification.from_pretrained(self.sentiment_model_name, cache_dir=HF_CACHE_DIR).to(device)
+
+    def load_spacy_model(self):
+        if self.nlp is None:
+            logger.info(f"Loading SpaCy model: {self.spacy_model_name}")
+            self.nlp = spacy.load(self.spacy_model_name)
+
+    def load_flair_model(self):
+        if self.flair_ner is None:
+            logger.info(f"Loading Flair model: {self.flair_model_name}")
+            self.flair_ner = SequenceTagger.load(self.flair_model_name)
 
     def process_ner_batch(self, batch: Dict[str, torch.Tensor], ner_confidence_threshold: float) -> List[List[Dict[str, str]]]:
+        self.load_ner_model()
         outputs = self.ner_model(**{k: v.to(device) for k, v in batch.items()})
         all_entities = []
 
@@ -147,6 +168,7 @@ class NERProcessor:
             logger.error("A task in advanced text processing timed out")
             return {"error": "Processing timed out"}
 
+        self.load_spacy_model()
         pos_tags = [(token.text, token.pos_) for token in self.nlp(resolved_query)]
         logger.debug(f"POS tags: {pos_tags}")
 
@@ -185,22 +207,28 @@ class NERProcessor:
         logger.info("Completed advanced text processing")
         return result
 
+    @lru_cache(maxsize=1000)
     def process_ner(self, query: str, ner_confidence_threshold: float = NER_CONFIDENCE_THRESHOLD) -> List[Dict[str, str]]:
-        if query in self.ner_cache:
-            return self.ner_cache[query]
-
+        self.load_ner_model()
         dataset = NERDataset([query], self.ner_tokenizer)
         dataloader = DataLoader(dataset, batch_size=1)
         batch = next(iter(dataloader))
         entities = self.process_ner_batch(batch, ner_confidence_threshold)[0]
-
-        self.ner_cache[query] = entities
         return entities
 
-    def extract_relations(self, query: str) -> List[Tuple[str, str, str]]:
-        if query in self.relation_cache:
-            return self.relation_cache[query]
+    def batch_process_ner(self, queries: List[str], ner_confidence_threshold: float = NER_CONFIDENCE_THRESHOLD) -> List[List[Dict[str, str]]]:
+        self.load_ner_model()
+        dataset = NERDataset(queries, self.ner_tokenizer)
+        dataloader = DataLoader(dataset, batch_size=BATCH_SIZE)
+        all_entities = []
+        for batch in dataloader:
+            batch_entities = self.process_ner_batch(batch, ner_confidence_threshold)
+            all_entities.extend(batch_entities)
+        return all_entities
 
+    @lru_cache(maxsize=1000)
+    def extract_relations(self, query: str) -> List[Tuple[str, str, str]]:
+        self.load_spacy_model()
         doc = self.nlp(query)
         relations = []
         for sent in doc.sents:
@@ -210,19 +238,16 @@ class NERProcessor:
                 for child in root.children:
                     if child.dep_ in ("dobj", "attr"):
                         relations.append((subject.text, root.text, child.text))
-
-        self.relation_cache[query] = relations
         return relations
 
+    @lru_cache(maxsize=1000)
     def analyze_sentiment(self, text: str) -> Dict[str, float]:
-        if text in self.sentiment_cache:
-            return self.sentiment_cache[text]
-
+        self.load_sentiment_model()
         inputs = self.sentiment_tokenizer(text, return_tensors="pt").to(device)
         with torch.no_grad():
             outputs = self.sentiment_model.generate(
                 **inputs,
-                num_beams=self.num_beams,  # Set num_beams using NUM_BEAMS from config.py
+                num_beams=self.num_beams,
                 max_length=50,
                 early_stopping=True
             )
@@ -232,18 +257,21 @@ class NERProcessor:
             "positive": scores[0][1].item(),
             "negative": scores[0][0].item()
         }
-
-        self.sentiment_cache[text] = sentiment
         return sentiment
 
+    @lru_cache(maxsize=1000)
     def entity_linking(self, entities, query: str):
-        if query in self.entity_linking_cache:
-            return self.entity_linking_cache[query]
-
         # Entity linking logic here...
-
-        self.entity_linking_cache[query] = linked_entities
+        linked_entities = []  # Placeholder for actual entity linking logic
         return linked_entities
+
+    def resolve_coreferences(self, text: str) -> str:
+        # Implement coreference resolution logic here
+        return text  # Placeholder, return original text for now
+
+    def find_similar_entities(self, entities, context_entities):
+        # Implement entity similarity logic here
+        return []  # Placeholder, return empty list for now
 
 async def main():
     # Example usage of the NERProcessor class
@@ -252,11 +280,13 @@ async def main():
         sentiment_model_name=sentiment_model_name,
         flair_model_name=flair_model_name,
         spacy_model_name=spacy_model_name,
-        num_beams=NUM_BEAMS  # Use NUM_BEAMS from config.py
+        num_beams=NUM_BEAMS
     )
 
-    # Further code as required
-    pass
+    # Example usage
+    query = "Apple Inc. was founded by Steve Jobs in Cupertino, California."
+    result = await ner_processor.process_text_advanced(query)
+    print(result)
 
 if __name__ == "__main__":
     asyncio.run(main())
