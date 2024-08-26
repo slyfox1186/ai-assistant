@@ -3,7 +3,7 @@
 import os
 
 # OpenAI API Configuration
-OPENAI_API_KEY = "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"
+OPENAI_API_KEY = ""
 
 # Directory Configurations
 INTERACTIONS_DIR = 'interactions'
