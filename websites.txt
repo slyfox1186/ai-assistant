@@ -1,0 +1,395 @@
+# MISC ERRORS
+https://stackoverflow.com/questions/28807935/attributeerror-str-object-has-no-attribute-get
+https://stackoverflow.com/questions/30042334/attribute-error-list-object-has-no-attribute-split
+https://stackoverflow.com/questions/36666353/typeerror-init-should-return-none-not-int
+
+# NONETYPE NO ATTRIBUTE 'GET'
+https://community.zapier.com/troubleshooting-99/error-nonetype-object-has-no-attribute-get-when-trying-to-update-latest-row-in-google-sheets-with-a-formula-20707
+https://python-forum.io/thread-35848.html
+https://python-forum.io/thread-40919.html
+
+# ASync IO
+https://docs.python.org/3/library/asyncio-api-index.html
+https://docs.python.org/3/library/asyncio-dev.html
+https://docs.python.org/3/library/asyncio-eventloop.html
+https://docs.python.org/3/library/asyncio-exceptions.html
+https://docs.python.org/3/library/asyncio-extending.html
+https://docs.python.org/3/library/asyncio-future.html
+https://docs.python.org/3/library/asyncio-llapi-index.html
+https://docs.python.org/3/library/asyncio-platforms.html
+https://docs.python.org/3/library/asyncio-policy.html
+https://docs.python.org/3/library/asyncio-protocol.html
+https://docs.python.org/3/library/asyncio-queue.html
+https://docs.python.org/3/library/asyncio-runner.html
+https://docs.python.org/3/library/asyncio-stream.html
+https://docs.python.org/3/library/asyncio-subprocess.html
+https://docs.python.org/3/library/asyncio-sync.html
+https://docs.python.org/3/library/asyncio-task.html
+
+# ASync Generator is not iterable
+
+# aiocache
+https://aiocache.aio-libs.org/en/latest/#usage
+https://aiocache.aio-libs.org/en/latest/caches.html
+https://aiocache.aio-libs.org/en/latest/configuration.html
+https://aiocache.aio-libs.org/en/latest/configuration.html
+https://aiocache.aio-libs.org/en/latest/locking.html
+https://aiocache.aio-libs.org/en/latest/plugins.html
+https://aiocache.aio-libs.org/en/latest/serializers.html
+https://aiocache.aio-libs.org/en/latest/testing.html
+
+# aiofiles | aiohttp
+https://github.com/Tinche/aiofiles?tab=readme-ov-file#readme
+https://docs.aiohttp.org/en/stable/faq.html#how-do-i-manage-a-clientsession-within-a-web-server
+
+# Cacheing
+https://github.com/aio-libs/aiocache/blob/d2b3f47034e9f0d6549114d6a1de5cf48bdc5cb8/README.rst#L105
+https://oxylabs.io/blog/python-cache-how-to-use-effectively
+https://stackoverflow.com/questions/31771286/python-in-memory-cache-with-time-to-live
+https://medium.com/@mcraddock/unlocking-efficiency-a-practical-guide-to-claude-prompt-caching-3185805c0eef
+
+# CuDNN
+https://docs.nvidia.com/deeplearning/cudnn/latest/api/cudnn-adv-library.html
+https://docs.nvidia.com/deeplearning/cudnn/latest/api/cudnn-cnn-library.html
+https://docs.nvidia.com/deeplearning/cudnn/latest/api/cudnn-graph-library.html
+https://docs.nvidia.com/deeplearning/cudnn/latest/api/cudnn-ops-library.html
+https://docs.nvidia.com/deeplearning/cudnn/latest/api/overview.html
+https://docs.nvidia.com/deeplearning/cudnn/latest/developer/core-concepts.html
+https://docs.nvidia.com/deeplearning/cudnn/latest/developer/overview.html
+https://docs.nvidia.com/deeplearning/cudnn/latest/installation/linux.html
+https://docs.nvidia.com/deeplearning/cudnn/latest/release-notes.html
+
+# cuPy
+https://docs.cupy.dev/en/stable/reference/index.html#cupy-reference
+https://docs.cupy.dev/en/stable/user_guide/basic.html
+https://docs.cupy.dev/en/stable/user_guide/compatibility.html
+https://docs.cupy.dev/en/stable/user_guide/cuda_api.html
+https://docs.cupy.dev/en/stable/user_guide/difference.html
+https://docs.cupy.dev/en/stable/user_guide/fft.html
+https://docs.cupy.dev/en/stable/user_guide/interoperability.html
+https://docs.cupy.dev/en/stable/user_guide/kernel.html
+https://docs.cupy.dev/en/stable/user_guide/memory.html
+https://docs.cupy.dev/en/stable/user_guide/performance.html
+
+# Data Storage
+https://datascience.stackexchange.com/questions/19802/best-practices-to-store-python-machine-learning-models
+https://medium.com/multisensory-data-training/storage-e7f37afba24c
+
+# Flask
+https://flask-sqlalchemy.palletsprojects.com/en/3.0.x/pagination/
+https://flask-sqlalchemy.readthedocs.io/en/3.0.x/contexts/
+https://flask-sqlalchemy.readthedocs.io/en/3.0.x/customizing/
+https://flask.palletsprojects.com/en/3.0.x/quickstart/
+https://flask.palletsprojects.com/en/3.0.x/tutorial/database/
+https://flask.palletsprojects.com/en/3.0.x/tutorial/layout/
+https://flask.palletsprojects.com/en/3.0.x/tutorial/static/
+https://flask.palletsprojects.com/en/3.0.x/tutorial/templates/
+https://flask.palletsprojects.com/en/3.0.x/tutorial/tests/
+https://flask.palletsprojects.com/en/3.0.x/tutorial/views/
+# streaming longchain example
+https://gist.github.com/python273/563177b3ad5b9f74c0f8f3299ec13850
+https://flask.palletsprojects.com/en/stable/patterns/streaming/
+
+# Jinja
+https://stackoverflow.com/questions/69228099/my-layout-of-my-dbc-row-dash-bootstrap-isnt-displaying-side-by-side
+https://stackoverflow.com/questions/71645272/importerror-cannot-import-name-markup-from-jinja2
+https://jinja.palletsprojects.com/en/3.1.x/api/
+https://jinja.palletsprojects.com/en/3.1.x/changes/
+https://jinja.palletsprojects.com/en/3.1.x/extensions/
+https://jinja.palletsprojects.com/en/3.1.x/integration/
+https://jinja.palletsprojects.com/en/3.1.x/nativetypes/
+https://jinja.palletsprojects.com/en/3.1.x/templates/
+https://jinja.palletsprojects.com/en/3.1.x/tricks/
+https://github.com/aio-libs/aiohttp-jinja2/blob/master/README.rst
+
+# Markdown
+https://python-markdown.github.io/cli/
+https://python-markdown.github.io/install/
+https://python-markdown.github.io/reference/
+https://stackoverflow.com/questions/76597068/format-output-text-response-from-openai-api-gpt
+https://stackoverflow.com/questions/77250639/importerror-cannot-import-name-markup-from-flask
+https://github.com/markedjs/marked/blob/master/README.md
+
+# Markupsafe Official
+https://markupsafe.palletsprojects.com/en/2.1.x/
+
+# MathJax
+https://docs.mathjax.org/en/latest/input/tex/eqnumbers.html
+https://docs.mathjax.org/en/latest/input/tex/extensions/boldsymbol.html
+https://math.meta.stackexchange.com/questions/5020/mathjax-basic-tutorial-and-quick-reference
+ttps://dash.plotly.com/dash-core-components/markdown
+
+# NLTK
+https://www.nltk.org/book/ch00.html
+https://www.nltk.org/book/ch01.html
+https://www.nltk.org/book/ch02.html
+https://www.nltk.org/book/ch03.html
+https://www.nltk.org/book/ch04.html
+https://www.nltk.org/book/ch05.html
+https://www.nltk.org/book/ch06.html
+https://www.nltk.org/book/ch07.html
+https://www.nltk.org/book/ch08.html
+https://www.nltk.org/book/ch09.html
+https://www.nltk.org/book/ch10.html
+https://www.nltk.org/book/ch11.html
+https://www.nltk.org/book/ch12.html
+
+# Numpy
+https://numpy.org/numpy-tutorials/
+https://numpy.org/doc/stable/user/basics.broadcasting.html
+https://numpy.org/doc/stable/user/basics.copies.html
+https://numpy.org/doc/stable/user/basics.creation.html
+https://numpy.org/doc/stable/user/basics.indexing.html
+https://numpy.org/doc/stable/user/basics.io.html
+https://numpy.org/doc/stable/user/basics.rec.html
+https://numpy.org/doc/stable/user/basics.strings.html
+https://numpy.org/doc/stable/user/basics.types.html
+https://numpy.org/doc/stable/user/basics.ufuncs.html
+https://numpy.org/doc/stable/user/howtos_index.html
+https://numpy.org/doc/stable/user/quickstart.html
+https://numpy.org/doc/stable/reference/arrays.dtypes.html
+https://numpy.org/devdocs/reference/generated/numpy.triu.html#numpy.triu
+https://numpy.org/doc/stable/release/1.3.0-notes.html#multiarray-api
+https://docs.scipy.org/doc/scipy/reference/generated/scipy.sparse.triu.html
+https://stackoverflow.com/questions/11942364/typeerror-integer-is-not-json-serializable-when-serializing-json-in-python
+
+# OpenAI API
+https://github.com/openai/openai-python/blob/main/examples/assistant_stream.py
+https://github.com/openai/openai-python/blob/main/examples/generate_file.sh
+https://github.com/openai/openai-python/blob/main/examples/module_client.py
+https://github.com/openai/openai-python/blob/main/examples/parsing.py
+https://github.com/openai/openai-python/blob/main/examples/parsing_stream.py
+https://github.com/openai/openai-python/blob/main/examples/streaming.py
+https://github.com/openai/openai-python/blob/main/examples/uploads.py
+https://github.com/openai/openai-python/blob/main/README.md
+https://platform.openai.com/docs/guides/prompt-caching
+https://platform.openai.com/docs/guides/prompt-engineering/six-strategies-for-getting-better-results
+https://platform.openai.com/docs/guides/structured-outputs/introduction
+
+# Pandas
+https://pandas.pydata.org/docs/user_guide/10min.html
+https://pandas.pydata.org/docs/user_guide/basics.html
+https://pandas.pydata.org/docs/user_guide/dsintro.html
+https://pandas.pydata.org/docs/user_guide/groupby.html
+https://pandas.pydata.org/docs/user_guide/indexing.html
+https://pandas.pydata.org/docs/user_guide/io.html
+https://pandas.pydata.org/docs/user_guide/merging.html
+https://pandas.pydata.org/docs/user_guide/missing_data.html
+https://pandas.pydata.org/docs/user_guide/reshaping.html
+https://pandas.pydata.org/docs/user_guide/text.html
+
+# Pytorch
+https://pytorch.org/docs/stable/autograd.html
+https://pytorch.org/docs/stable/cpu.html
+https://pytorch.org/docs/stable/cuda.html
+https://pytorch.org/docs/stable/named_tensor.html
+https://pytorch.org/docs/stable/nn.functional.html
+https://pytorch.org/docs/stable/tensor_attributes.html
+https://pytorch.org/docs/stable/tensor_view.html
+https://pytorch.org/docs/stable/tensorboard.html
+https://pytorch.org/docs/stable/tensors.html
+https://pytorch.org/docs/stable/torch_cuda_memory.html
+https://pytorch.org/docs/stable/torch_environment_variables.html
+https://github.com/pytorch/pytorch/issues/82881 # export ATEN_CPU_CAPABILITY="avx512"
+
+# Quart
+https://quart.palletsprojects.com/en/latest/discussion/async_compatibility.html
+https://quart.palletsprojects.com/en/latest/discussion/background_tasks.html
+https://quart.palletsprojects.com/en/latest/how_to_guides/configuration.html
+https://quart.palletsprojects.com/en/latest/how_to_guides/json_encoding.html
+https://quart.palletsprojects.com/en/latest/how_to_guides/logging.html
+https://quart.palletsprojects.com/en/latest/how_to_guides/routing.html
+https://quart.palletsprojects.com/en/latest/how_to_guides/server_sent_events.html
+https://quart.palletsprojects.com/en/latest/how_to_guides/streaming_response.html
+https://quart.palletsprojects.com/en/latest/how_to_guides/testing.html
+
+# Radon
+https://radon.readthedocs.io/en/latest/api.html
+https://radon.readthedocs.io/en/latest/changelog.html
+https://radon.readthedocs.io/en/latest/changelog.html
+https://radon.readthedocs.io/en/latest/changelog.html#jan-28-2020
+https://radon.readthedocs.io/en/latest/commandline.html
+https://radon.readthedocs.io/en/latest/flake8.html
+https://radon.readthedocs.io/en/latest/intro.html
+
+# Requests
+https://requests.readthedocs.io/en/latest/user/advanced/#streaming-requests
+https://requests.readthedocs.io/en/latest/user/quickstart/#response-content
+https://requests.readthedocs.io/en/latest/user/quickstart/#response-headers
+
+# Sentence Transformers
+https://sbert.net/docs/sentence_transformer/dataset_overview.html
+https://sbert.net/docs/sentence_transformer/loss_overview.html
+https://sbert.net/docs/sentence_transformer/pretrained_models.html
+https://sbert.net/docs/sentence_transformer/training/distributed.html
+https://sbert.net/docs/sentence_transformer/training/examples.html
+https://sbert.net/docs/sentence_transformer/training_overview.html
+https://sbert.net/docs/sentence_transformer/usage/custom_models.html
+https://sbert.net/docs/sentence_transformer/usage/semantic_textual_similarity.html
+https://sbert.net/docs/sentence_transformer/usage/usage.html
+https://sbert.net/examples/applications/clustering/README.html
+https://sbert.net/examples/applications/computing-embeddings/README.html
+https://sbert.net/examples/applications/embedding-quantization/README.html
+https://sbert.net/examples/applications/image-search/README.html
+https://sbert.net/examples/applications/parallel-sentence-mining/README.html
+https://sbert.net/examples/applications/paraphrase-mining/README.html
+https://sbert.net/examples/applications/retrieve_rerank/README.html
+https://sbert.net/examples/applications/semantic-search/README.html
+https://sbert.net/examples/domain_adaptation/README.html
+https://sbert.net/examples/training/adaptive_layer/README.html
+https://sbert.net/examples/training/data_augmentation/README.html
+https://sbert.net/examples/training/distillation/README.html
+https://sbert.net/examples/training/hpo/README.html
+https://sbert.net/examples/training/matryoshka/README.html
+https://sbert.net/examples/training/ms_marco/README.html
+https://sbert.net/examples/training/multilingual/README.html
+https://sbert.net/examples/training/nli/README.html
+https://sbert.net/examples/training/paraphrases/README.html
+https://sbert.net/examples/training/quora_duplicate_questions/README.html
+https://sbert.net/examples/training/sts/README.html
+https://sbert.net/examples/unsupervised_learning/README.html
+
+# Simpy
+https://docs.sympy.org/latest/guides/assumptions.html
+https://docs.sympy.org/latest/guides/booleans.html
+https://docs.sympy.org/latest/guides/custom-functions.html
+https://docs.sympy.org/latest/guides/physics/control_problems.html
+https://docs.sympy.org/latest/guides/solving/find-roots-polynomial.html
+https://docs.sympy.org/latest/guides/solving/reduce-inequalities-algebraically.html
+https://docs.sympy.org/latest/guides/solving/solve-diophantine-equation.html
+https://docs.sympy.org/latest/guides/solving/solve-equation-algebraically.html
+https://docs.sympy.org/latest/guides/solving/solve-matrix-equation.html
+https://docs.sympy.org/latest/guides/solving/solve-numerically.html
+https://docs.sympy.org/latest/guides/solving/solve-ode.html
+https://docs.sympy.org/latest/guides/solving/solve-system-of-equations-algebraically.html
+
+# Tenacity
+https://tenacity.readthedocs.io/en/latest/
+
+# TF-Keras
+https://github.com/PaddlePaddle/Paddle/issues/43261
+https://stackoverflow.com/questions/56939076/convert-to-generator-like-num-samples-attribute-error-int-object-has-no-attri
+https://stackoverflow.com/questions/67317332/keras-custom-data-generator-error-int-object-has-no-attribute-shape
+https://stackoverflow.com/questions/73836024/int-object-has-no-attribute-shape-while-defining-convolutions
+https://stackoverflow.com/questions/74132742/exception-has-occurred-attributeerror-int-object-has-no-attribute-shape-whe
+https://stackoverflow.com/questions/78742862/attributeerror-int-object-has-no-attribute-shape
+
+# Tiktoken
+https://github.com/openai/tiktoken/blob/main/README.md
+# TQDM
+https://tqdm.github.io/dev/TMonitor/
+https://tqdm.github.io/dev/warnings/
+https://tqdm.github.io/docs/asyncio/
+https://tqdm.github.io/docs/cli/
+https://tqdm.github.io/docs/contrib.concurrent/
+https://tqdm.github.io/docs/contrib.discord/
+https://tqdm.github.io/docs/contrib.itertools/
+https://tqdm.github.io/docs/contrib.logging/
+https://tqdm.github.io/docs/contrib.slack/
+https://tqdm.github.io/docs/contrib.telegram/
+https://tqdm.github.io/docs/contrib/
+https://tqdm.github.io/docs/dask/
+https://tqdm.github.io/docs/gui/
+https://tqdm.github.io/docs/keras/
+https://tqdm.github.io/docs/notebook/
+https://tqdm.github.io/docs/rich/
+https://tqdm.github.io/docs/shortcuts/
+https://tqdm.github.io/docs/tk/
+https://tqdm.github.io/docs/tqdm.utils/
+https://tqdm.github.io/docs/tqdm/
+
+
+# werkzeug
+https://werkzeug.palletsprojects.com/en/3.0.x/levels/
+https://werkzeug.palletsprojects.com/en/3.0.x/levels/#example
+https://werkzeug.palletsprojects.com/en/3.0.x/levels/#high-or-low
+https://werkzeug.palletsprojects.com/en/3.0.x/quickstart/
+https://werkzeug.palletsprojects.com/en/3.0.x/quickstart/#enter-request
+https://werkzeug.palletsprojects.com/en/3.0.x/quickstart/#header-parsing
+https://werkzeug.palletsprojects.com/en/3.0.x/quickstart/#responses
+https://werkzeug.palletsprojects.com/en/3.0.x/quickstart/#wsgi-environment
+https://werkzeug.palletsprojects.com/en/3.0.x/tutorial/
+https://werkzeug.palletsprojects.com/en/3.0.x/tutorial/#bonus-refinements
+https://werkzeug.palletsprojects.com/en/3.0.x/tutorial/#intermezzo-running-the-application
+https://werkzeug.palletsprojects.com/en/3.0.x/tutorial/#introducing-shortly
+https://werkzeug.palletsprojects.com/en/3.0.x/tutorial/#step-0-a-basic-wsgi-introduction
+https://werkzeug.palletsprojects.com/en/3.0.x/tutorial/#step-1-creating-the-folders
+https://werkzeug.palletsprojects.com/en/3.0.x/tutorial/#step-2-the-base-structure
+https://werkzeug.palletsprojects.com/en/3.0.x/tutorial/#step-3-the-environment
+https://werkzeug.palletsprojects.com/en/3.0.x/tutorial/#step-4-the-routing
+https://werkzeug.palletsprojects.com/en/3.0.x/tutorial/#step-5-the-first-view
+https://werkzeug.palletsprojects.com/en/3.0.x/tutorial/#step-6-redirect-view
+https://werkzeug.palletsprojects.com/en/3.0.x/tutorial/#step-7-detail-view
+https://werkzeug.palletsprojects.com/en/3.0.x/tutorial/#step-8-templates
+https://werkzeug.palletsprojects.com/en/3.0.x/tutorial/#step-9-the-style
+
+# NVIDIA MODEL
+https://huggingface.co/nvidia/Llama3-ChatQA-2-70B/tree/main/data
+https://huggingface.co/datasets/nvidia/ChatQA2-Long-SFT-data
+https://chatqa2-project.github.io/
+https://arxiv.org/abs/2407.14482
+
+#################
+# SPECIAL CASES #
+#################
+
+# FLASK STREAMING
+https://docs.python.org/3/library/asyncio-runner.html
+https://docs.python.org/3/library/asyncio-stream.html
+https://flask.palletsprojects.com/en/stable/patterns/streaming/
+https://gist.github.com/python273/563177b3ad5b9f74c0f8f3299ec13850
+https://requests.readthedocs.io/en/latest/user/advanced/#streaming-requests
+https://werkzeug.palletsprojects.com/en/3.0.x/quickstart/#responses
+https://werkzeug.palletsprojects.com/en/3.0.x/quickstart/#wsgi-environment
+https://werkzeug.palletsprojects.com/en/3.0.x/tutorial/#step-0-a-basic-wsgi-introduction
+https://werkzeug.palletsprojects.com/en/3.0.x/tutorial/#step-4-the-routing
+https://werkzeug.palletsprojects.com/en/3.0.x/tutorial/#step-5-the-first-view
+https://werkzeug.palletsprojects.com/en/3.0.x/tutorial/#step-6-redirect-view
+https://huggingface.co/nvidia/Llama3-ChatQA-2-8B
+https://stackoverflow.com/questions/56783182/runtimeerror-the-size-of-tensor-a-133-must-match-the-size-of-tensor-b-10-at
+
+# TypeError: 'function' object is not iterable
+https://discuss.python.org/t/yield-from-in-async-functions/47050
+https://github.com/arc53/DocsGPT/issues/550
+https://github.com/langchain-ai/langchain/issues/17821
+https://github.com/microsoft/pyright/issues/2322
+https://github.com/microsoft/pyright/issues/727
+https://github.com/microsoft/TypeScript/issues/33458
+https://github.com/python/mypy/issues/10534
+https://github.com/python/mypy/issues/5385
+https://github.com/raspberrypi/picamera2/issues/366
+https://stackoverflow.com/questions/36076490/debugging-a-request-response-in-python-flask
+https://stackoverflow.com/questions/46785931/what-is-the-type-of-asynchronous-iterator
+https://stackoverflow.com/questions/51852691/how-to-iterate-a-sync-iterator-and-an-async-generator-with-the-same-for-statemen
+https://stackoverflow.com/questions/59058889/consume-async-iterable-without-variable-declaration
+https://stackoverflow.com/questions/62866945/middleware-caught-exception-in-streamed-response-flask-app
+https://stackoverflow.com/questions/62870824
+https://stackoverflow.com/questions/64174255/typescript-async-generator-compilation-type-issues
+https://stackoverflow.com/questions/68118210/runtimeerror-working-outside-of-request-context-flask
+https://stackoverflow.com/questions/68349189/how-response-headers-be-sent-to-the-client-when-the-middleware-pipeline-hasnt-f
+https://stackoverflow.com/questions/70876394/async-generator-object-is-not-iterable
+https://stackoverflow.com/questions/71510629/catch-a-break-in-trio-async-generator
+https://stackoverflow.com/questions/78635170/streaming-a-async-function-in-flask
+https://werkzeug.palletsprojects.com/en/3.0.x/quickstart/#responses
+https://werkzeug.palletsprojects.com/en/3.0.x/quickstart/#wsgi-environment
+https://werkzeug.palletsprojects.com/en/3.0.x/tutorial/#step-0-a-basic-wsgi-introduction
+https://werkzeug.palletsprojects.com/en/3.0.x/tutorial/#step-4-the-routing
+
+# Error in stream generation: 'async for' requires an object with __aiter__ method, got coroutine
+https://github.com/DataDog/dd-trace-py/issues/983
+https://github.com/long2ice/meilisync/issues/76
+https://github.com/music-assistant/hass-music-assistant/issues/2208
+https://github.com/run-llama/llama_index/discussions/15843
+https://stackoverflow.com/questions/36695256/python-asyncio-how-to-mock-aiter-method
+https://stackoverflow.com/questions/67885961/python-iterate-over-either-a-list-or-an-async-generator
+https://stackoverflow.com/questions/73055130/why-does-this-fail-with-async-for-requires-an-object-with-aiter-method-g
+https://stackoverflow.com/questions/73055827/async-generator-says-it-doesnt-implement-anext-when-it-does
+https://stackoverflow.com/questions/78959252/typeerror-async-for-requires-an-object-with-aiter-method-got-coroutine
+
+# AttributeError: 'NoneType' object has no attribute 'encode'
+https://forum.greenbone.net/t/nonetype-object-has-no-attribute-encode/7355
+https://stackoverflow.com/questions/25967959/how-to-resolve-attributeerror-nonetype-object-has-no-attribute-encode-in-py
+https://stackoverflow.com/questions/414230/python-nonetype-object-has-no-attribute-encode
+https://stackoverflow.com/questions/47977846/attributeerror-nonetype-object-has-no-attribute-encode-while-writing-into-f
+https://stackoverflow.com/questions/59003664/how-to-fix-attributeerror-nonetype-object-has-no-attribute-encode-using-smt
+https://stackoverflow.com/questions/9913963/attributeerror-nonetype-object-has-no-attribute-encode-with-lxml-python
