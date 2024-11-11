@@ -1,3 +1,5 @@
+# src/model.py
+
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
 import os
@@ -66,29 +68,32 @@ class Llama3ChatQAssistant:
             message = messages[-1]["content"]
             self.memory.add("user", message)
             
-            # Check for identity updates
+            # Check for identity updates in the message
             message_lower = message.lower()
             if "my name is" in message_lower:
-                name = message_lower.split("my name is")[-1].strip().split()[0].capitalize()
-                self.memory.update_identity("user", name)
+                # Extract name after "my name is"
+                name_start = message_lower.index("my name is") + len("my name is")
+                name = message_lower[name_start:].strip().split()[0].capitalize()
+                
+                # Update user identity
+                if name:
+                    self.memory.update_identity("user", name)
             
-            # Build prompt following NVIDIA's format
-            formatted_input = f"System: {self.system_prompt}\n\n"
-            
-            # Load current identities
+            # Build prompt with current identities
             with open("data/json/identities.json", 'r') as f:
                 identities = json.load(f)
                 
-            # Load memory context
-            with open("data/memory/brain_memory.json", 'r') as f:
-                memory_data = json.load(f)
+                formatted_input = f"System: {self.system_prompt}\n\n"
                 
-            # Add identity context
-            if identities["identities"]["assistant"]["name"]:
-                formatted_input += f"Assistant's name: {identities['identities']['assistant']['name']}\n"
-            if identities["identities"]["user"]["name"]:
-                formatted_input += f"User's name: {identities['identities']['user']['name']}\n"
-            formatted_input += "\n"
+                # Add identity context
+                assistant_name = identities["identities"]["assistant"]["name"]
+                user_name = identities["identities"]["user"]["name"]
+                
+                formatted_input += f"The assistant's name is {assistant_name}. "
+                formatted_input += f"The assistant must always identify as {assistant_name}.\n"
+                if user_name:
+                    formatted_input += f"The user's name is {user_name}.\n"
+                formatted_input += "\n"
                 
             # Add conversation history
             for msg in messages[-3:]:  # Keep last 3 turns

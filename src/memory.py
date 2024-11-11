@@ -16,29 +16,25 @@ class Memory:
         self.last_access = self.timestamp
         self.importance = 1.0
         
-        # Keep existing attributes needed by other parts
         self.attributes = {
-            "is_identity": False,
-            "is_question": False,
+            "is_identity": memory_type == "identity",
+            "is_question": "?" in content,
             "needs_context": False,
             "last_accessed": time.time()
         }
         
-        # Keep identity info needed by other parts
         self.identity_info = {
             "user_name": None,
-            "assistant_name": None,
+            "assistant_name": "Charlotte",  # Always set assistant name
             "mentioned_names": []
         }
         
-        # Keep context info needed by other parts
         self.context = {
             "topic": None,
             "intent": None,
             "key_entities": []
         }
         
-        # Keep associations needed by other parts
         self.associations = []
 
 class BrainMemory:
@@ -47,8 +43,8 @@ class BrainMemory:
     def __init__(self, memory_file: str = "data/memory/brain_memory.json"):
         self.memory_file = memory_file
         self.conversations = []
-        self.semantic = []  # Keep semantic for identity persistence
-        self.identity_index = {}
+        self.semantic = []
+        self.identity_manager = IdentityManager()  # Initialize IdentityManager
         self._load_memories()
 
     def add(self, role: str, content: str):
@@ -61,14 +57,16 @@ class BrainMemory:
         
         try:
             if "my name is" in content_lower and role == "user":
-                # Extract name properly
+                # Extract name properly - handle the full name after "my name is"
                 name_start = content_lower.index("my name is") + len("my name is")
-                name = content_lower[name_start:].strip().split()[0].capitalize()
+                name = content_lower[name_start:].strip()  # Get full name after "my name is"
                 
-                if name:  # Only update if we got a valid name
-                    # Update identity through IdentityManager
-                    identity_manager = IdentityManager()
-                    if identity_manager.update_identity("user", name):
+                if name:
+                    # Clean up the name - remove punctuation and extra spaces
+                    name = ' '.join(word.capitalize() for word in name.split())
+                    
+                    # Update user identity through IdentityManager
+                    if self.identity_manager.update_identity("user", name):
                         # Create identity memory
                         identity_memory = Memory(
                             role="system",
@@ -77,28 +75,37 @@ class BrainMemory:
                         )
                         identity_memory.attributes["is_identity"] = True
                         self.semantic.append(identity_memory)
-                        self.identity_index["user"] = name
+                        
+                        # Update the current memory's identity info
+                        memory.identity_info["user_name"] = name
             
+            # Always ensure assistant identity is preserved
+            assistant_name = self.identity_manager.get_identity("assistant")
+            if assistant_name:
+                memory.identity_info["assistant_name"] = assistant_name
+                
+            # Update user name in memory
+            user_name = self.identity_manager.get_identity("user")
+            if user_name:
+                memory.identity_info["user_name"] = user_name
+                
         except Exception as e:
-            print(f"Error updating identities: {e}")
+            print(f"Error handling identity: {e}")
         
-        # Save memory
         self._save_memories()
 
     def get_context(self, max_turns: int = 5) -> str:
-        """Get recent conversation context."""
+        """Get recent conversation context with identities."""
         context_parts = []
         
-        # Load current identities
-        try:
-            with open("data/json/identities.json", 'r') as f:
-                identities = json.load(f)
-                if identities["identities"]["assistant"]["name"]:
-                    context_parts.append(f"The assistant's name is {identities['identities']['assistant']['name']}.")
-                if identities["identities"]["user"]["name"]:
-                    context_parts.append(f"The user's name is {identities['identities']['user']['name']}.")
-        except Exception as e:
-            print(f"Error loading identities: {e}")
+        # Add identity information
+        assistant_name = self.identity_manager.get_identity("assistant")
+        user_name = self.identity_manager.get_identity("user")
+        
+        if assistant_name:
+            context_parts.append(f"The assistant's name is {assistant_name}.")
+        if user_name:
+            context_parts.append(f"The user's name is {user_name}.")
         
         # Add recent conversation turns
         recent = self.conversations[-max_turns:]
@@ -109,25 +116,17 @@ class BrainMemory:
         return "\n\n".join(context_parts)
 
     def update_identity(self, role: str, name: str):
-        """Update identity with persistence."""
-        self.identity_index[role] = name
-        
-        # Create identity memory with explicit instruction
-        memory = Memory(
-            role="system",
-            content=f"The {role}'s name is {name}. Always use this name when referring to the {role}.",
-            memory_type="identity"
-        )
-        memory.attributes["is_identity"] = True
-        
-        # Remove any old identity memories for this role
-        self.semantic = [m for m in self.semantic 
-                        if not (m.attributes.get("is_identity") and 
-                               role in m.content.lower())]
-        
-        # Add to semantic for persistence
-        self.semantic.append(memory)
-        self._save_memories()
+        """Update identity through IdentityManager."""
+        if self.identity_manager.update_identity(role, name):
+            # Create identity memory
+            identity_memory = Memory(
+                role="system",
+                content=f"The {role}'s name is {name}.",
+                memory_type="identity"
+            )
+            identity_memory.attributes["is_identity"] = True
+            self.semantic.append(identity_memory)
+            self._save_memories()
 
     def get_identity(self, role: str) -> Optional[str]:
         """Get identity."""
@@ -139,7 +138,7 @@ class BrainMemory:
         self._save_memories()
 
     def _save_memories(self):
-        """Save memories to file."""
+        """Save memories with proper identity information."""
         try:
             data = {
                 "conversations": [
@@ -150,7 +149,11 @@ class BrainMemory:
                         "type": m.type,
                         "context_type": m.context_type,
                         "attributes": m.attributes,
-                        "identity_info": m.identity_info,
+                        "identity_info": {
+                            "user_name": self.identity_manager.get_identity("user"),
+                            "assistant_name": self.identity_manager.get_identity("assistant"),
+                            "mentioned_names": m.identity_info.get("mentioned_names", [])
+                        },
                         "context": m.context,
                         "associations": m.associations
                     }
@@ -164,13 +167,13 @@ class BrainMemory:
                         "attributes": m.attributes
                     }
                     for m in self.semantic
-                ],
-                "identity_index": self.identity_index
+                ]
             }
             
             os.makedirs(os.path.dirname(self.memory_file), exist_ok=True)
             with open(self.memory_file, 'w') as f:
                 json.dump(data, f, indent=2)
+            
         except Exception as e:
             print(f"Error saving memories: {e}")
 

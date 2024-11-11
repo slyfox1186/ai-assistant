@@ -2,15 +2,17 @@
   "identities": {
     "assistant": {
       "name": "Charlotte",
-      "locked": true
+      "locked": true,
+      "last_updated": null
     },
     "user": {
       "name": "",
-      "locked": false
+      "locked": false,
+      "last_updated": null
     }
   },
   "metadata": {
-    "last_updated": 1731326426.9361625,
+    "last_updated": 1731339427.3756332,
     "version": "1.0"
   }
 }
