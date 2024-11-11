@@ -7,18 +7,18 @@ class Llama3ChatQAssistant:
         """Initialize model following NVIDIA's recommendations."""
         try:
             self.tokenizer = AutoTokenizer.from_pretrained(model_id)
-            
+
             # Set pad token to eos token if not set (required for Llama models)
             if self.tokenizer.pad_token is None:
                 self.tokenizer.pad_token = self.tokenizer.eos_token
-                
+
             self.model = AutoModelForCausalLM.from_pretrained(
                 model_id,
                 torch_dtype=torch.float16,  # Use float16 as recommended by NVIDIA
                 device_map=device,
                 low_cpu_mem_usage=True     # Optimize memory usage
             )
-            
+
             # Initialize conversation history
             self.conversation_history = []
             
@@ -39,14 +39,14 @@ class Llama3ChatQAssistant:
             # Add context if available
             if context and context.strip():
                 formatted_input += f"{context}\n\n"
-            
+
             # Add conversation history
             for msg in self.conversation_history + messages:
                 if msg["role"] == "user":
                     formatted_input += f"User: {msg['content']}\n\n"
                 else:
                     formatted_input += f"Assistant: {msg['content']}\n\n"
-            
+
             # Add final prompt
             formatted_input += "Assistant:"
             

@@ -333,7 +333,7 @@ https://arxiv.org/abs/2407.14482
 # SPECIAL CASES #
 #################
 
-# FLASK STREAMING
+# Flask Streaming
 https://docs.python.org/3/library/asyncio-runner.html
 https://docs.python.org/3/library/asyncio-stream.html
 https://flask.palletsprojects.com/en/stable/patterns/streaming/

@@ -1,6 +1,11 @@
 from src.model import Llama3ChatQAssistant
 import sys
 import torch
+import os
+
+def clear_screen():
+    """Clear the terminal screen."""
+    os.system('cls' if os.name == 'nt' else 'clear')
 
 def main():
     try:
@@ -21,12 +26,15 @@ def main():
                     
                 if user_input.lower() == 'quit':
                     break
+                elif user_input.lower() == 'clear':
+                    chat_model.clear_history()
+                    clear_screen()  # Clear the screen
+                    print("Model ready! Type 'quit' to exit.")  # Reprint the header
+                    continue
                 
                 # Let model handle the conversation naturally
                 message = {"role": "user", "content": user_input}
-                print("\nAssistant: ", end='', flush=True)
-                response = chat_model.generate_response([message])
-                print(response)
+                chat_model.generate_response([message])  # Response is printed during streaming
                 
             except KeyboardInterrupt:
                 print("\nExiting...")
