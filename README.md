@@ -27,7 +27,7 @@
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/llama3-chatqa-assistant.git
+git clone https://github.com/slyfox1186/ai-assistant.git
 cd llama3-chatqa-assistant
 ```
 
