@@ -27,8 +27,8 @@
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/llama3-chatqa-assistant.git
-cd llama3-chatqa-assistant
+git clone https://github.com/slyfox1186/ai-assistant.git
+cd ai-assistant
 ```
 
 2. Install dependencies:
@@ -38,19 +38,19 @@ pip install -r requirements.txt
 
 3. Download the model:
 ```bash
-python scripts/download_model.py
+python3 scripts/download_model.py
 ```
 
 ## Usage
 
 ### Basic Usage
 ```bash
-python main.py
+python3 main.py
 ```
 
 ### CLI Interface
 ```bash
-python cli.py --model nvidia/Llama3-ChatQA-2-8B
+python3 cli.py --model nvidia/Llama3-ChatQA-2-8B
 ```
 
 ## Troubleshooting
@@ -78,10 +78,6 @@ python cli.py --model nvidia/Llama3-ChatQA-2-8B
 3. Implement changes
 4. Add tests
 5. Submit pull request
-
-## License
-
-[Your chosen license]
 
 ## Acknowledgments
 
