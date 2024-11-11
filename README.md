@@ -79,10 +79,6 @@ python cli.py --model nvidia/Llama3-ChatQA-2-8B
 4. Add tests
 5. Submit pull request
 
-## License
-
-[Your chosen license]
-
 ## Acknowledgments
 
 - NVIDIA for Llama3-ChatQA-2-8B
