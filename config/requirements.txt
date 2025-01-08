@@ -1,0 +1,4 @@
+flask
+llama-cpp-python
+redis
+numpy

@@ -1,0 +1,41 @@
+{
+    "system": {
+        "model_path": "./models/Qwen2.5-7B-Instruct-f16.gguf",
+        "memory_settings": {
+            "redis": {
+                "host": "localhost",
+                "port": 6379,
+                "db": 0
+            }
+        },
+        "api_keys": {
+            "youtube": "${YOUTUBE_API_KEY}",
+            "google": {
+                "api_key": "AIzaSyD4Vm7co689cNo-Rbznub85CY7YU4zqeOw",
+                "cse_id": "f2a9a9431a797430a"
+            }
+        }
+    },
+    "personality": {
+        "name": "Lotte",
+        "traits_file": "static/json/charlotte_personality_traits.json",
+        "current_config": "config/personality/current_personality.json"
+    },
+    "nodes": {
+        "enabled": [
+            "personality",
+            "datetime",
+            "websearch",
+            "youtube"
+        ],
+        "youtube": {
+            "enabled": true,
+            "api_version": "v3",
+            "max_results": 5
+        },
+        "google": {
+            "enabled": true,
+            "search_type": "customsearch"
+        }
+    }
+}

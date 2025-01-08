@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Assistant</title>
+    <base href="/">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/15.0.5/marked.min.js" integrity="sha512-XoaXLJ3dYtMjpO3JrVpcgfXbVbAS3OFU3+wfs/ZHvu37N0zfNcWsOA5k3qKj9TmnzMvb0GTGy06OEbJRpjqfyA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github-dark.min.css" integrity="sha512-rO+olRTkcf304DQBxSWxln8JXCzTHlKnIdnMUwYvQa9/Jd4cQaNkItIUj6Z4nvW1dqK0SKXLbn9h4KwZTNtAyw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js" integrity="sha512-EBLzUL8XLl+va/zAsmXwS7Z2B1F9HUHkZwyS/VKwh3S7T/U0nF4BaU29EP/ZSf6zgiIxYAnKLu6bJ8dqpmX5uw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+</head>
+<body>
+    <div class="app-container">
+        <header>
+            <div class="header-content">
+                <h1>AI Assistant</h1>
+                <div class="controls">
+                    <button id="clearMemory" class="clear-button" title="Clear conversation history">Clear Memory</button>
+                    <button id="resetSystem" class="clear-button" title="Reset all memory and system state">Reset System</button>
+                    <div class="theme-control">
+                        <input 
+                            type="range" 
+                            id="theme-slider" 
+                            min="0" 
+                            max="100" 
+                            value="100"
+                            class="theme-slider"
+                        >
+                        <label for="theme-slider">Background</label>
+                    </div>
+                </div>
+            </div>
+        </header>
+        
+        <main class="chat-container">
+            <div id="chat-messages" class="messages"></div>
+            
+            <form id="chat-form" class="input-container" onsubmit="return false;">
+                <textarea 
+                    id="user-input" 
+                    placeholder="Type your message..." 
+                    rows="1"
+                    autofocus
+                ></textarea>
+                <button id="send-button" type="button">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M22 2L11 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+            </form>
+        </main>
+    </div>
+    <script src="{{ url_for('static', filename='js/script.js') }}" defer></script>
+</body>
+</html> 
