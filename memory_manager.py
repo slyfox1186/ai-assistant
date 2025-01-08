@@ -65,13 +65,18 @@ class MemoryManager:
             
             # Initialize sentence transformer with proper downloading and verification
             logger.info("Initializing sentence transformer model...")
-            model_id = 'sentence-transformers/all-mpnet-base-v2'  # Use full model ID
+            model_id = 'sentence-transformers/gtr-t5-xxl'  # Much more powerful model (4.8B parameters)
             cache_dir = os.path.expanduser('~/.cache/torch/sentence_transformers')
             os.makedirs(cache_dir, exist_ok=True)
             
             try:
                 # First try to use huggingface_hub to verify model
                 from huggingface_hub import snapshot_download, HfFolder, hf_hub_download
+                import torch
+                
+                # Force CPU usage before any model loading
+                torch.cuda.is_available = lambda: False
+                os.environ['CUDA_VISIBLE_DEVICES'] = ''
                 
                 # Enable faster downloads if available
                 os.environ['HF_HUB_ENABLE_HF_TRANSFER'] = '1'
@@ -398,105 +403,25 @@ class MemoryManager:
             return []
 
     def format_memories_for_prompt(self) -> str:
-        """Format all memories for inclusion in the prompt"""
+        """Present memories exactly as stored for the model to interpret"""
         try:
-            # Get special memory first
+            memories = []
+            
+            # Add special memories with their exact format
             special = self.get_special_memory()
-            formatted_memories = []
-            
-            # Special memories section - critical user information that must never be forgotten
-            formatted_memories.append("\n=== 🔒 SPECIAL MEMORIES (Must Never Be Forgotten) ===")
             if special and 'content' in special:
-                content = special.get('content', '')
-                entries = []
-                
-                # Parse entries
-                raw_entries = [e.strip() for e in content.split('\n') if e.strip()]
-                
-                # Group entries by type for better organization
-                personal_info = []
-                locations = []
-                preferences = []
-                other = []
-                
-                for entry in raw_entries:
-                    if "Address:" in entry or "Location:" in entry:
-                        locations.append(entry)
-                    elif "Name:" in entry or "Phone:" in entry:
-                        personal_info.append(entry)
-                    elif "Preference:" in entry:
-                        preferences.append(entry)
-                    else:
-                        other.append(entry)
-                
-                # Format each category
-                if personal_info:
-                    formatted_memories.append("Personal Information:")
-                    for i, entry in enumerate(personal_info, 1):
-                        formatted_memories.append(f"  {i}. {entry}")
-                
-                if locations:
-                    formatted_memories.append("Important Locations:")
-                    for i, entry in enumerate(locations, 1):
-                        formatted_memories.append(f"  {i}. {entry}")
-                
-                if preferences:
-                    formatted_memories.append("User Preferences:")
-                    for i, entry in enumerate(preferences, 1):
-                        formatted_memories.append(f"  {i}. {entry}")
-                
-                if other:
-                    formatted_memories.append("Other Important Information:")
-                    for i, entry in enumerate(other, 1):
-                        formatted_memories.append(f"  {i}. {entry}")
-            else:
-                formatted_memories.append("No special memories stored yet.")
+                memories.append(special.get('content', ''))
             
-            # Get a mix of recent and relevant memories
-            # First, get 5 most recent memories for immediate context
-            recent_memories = self.get_recent_memories(limit=5)
+            # Add recent context
+            recent = self.get_recent_memories(limit=5)
+            if recent:
+                memories.append("\nRECENT CONTEXT:")
+                for memory in recent:
+                    content = memory.get('content', '')
+                    if content:
+                        memories.append(content)
             
-            # Then get relevant memories if we have a recent memory to compare against
-            relevant_memories = []
-            if recent_memories:
-                # Use the most recent memory as the query for finding relevant ones
-                query = recent_memories[0].get('content', '')
-                relevant_memories = self.find_similar_memories(query, k=5)
-                
-                # Filter out memories that are too similar (likely duplicates)
-                seen_hashes = set()
-                filtered_memories = []
-                for memory in relevant_memories:
-                    content = memory.get('content', '').strip()
-                    memory_hash = hashlib.sha256(content.encode()).hexdigest()
-                    if memory_hash not in seen_hashes and memory.get('similarity', 0) > 0.5:  # Only include if similarity > 0.5
-                        seen_hashes.add(memory_hash)
-                        filtered_memories.append(memory)
-                relevant_memories = filtered_memories
-
-            # Combine and deduplicate memories
-            all_memories = []
-            seen_contents = set()
-            
-            # Add recent memories first
-            if recent_memories:
-                formatted_memories.append("\n=== 📝 RECENT CONTEXT ===")
-                for memory in recent_memories:
-                    content = memory.get('content', '').strip()
-                    if content and not content.startswith('SPECIAL_MEMORY:') and content not in seen_contents:
-                        formatted_memories.append(f"- {content}")
-                        seen_contents.add(content)
-            
-            # Add relevant memories
-            if relevant_memories:
-                formatted_memories.append("\n=== 🔍 RELEVANT CONTEXT ===")
-                for memory in relevant_memories:
-                    content = memory.get('content', '').strip()
-                    if content and not content.startswith('SPECIAL_MEMORY:') and content not in seen_contents:
-                        formatted_memories.append(f"- {content}")
-                        seen_contents.add(content)
-            
-            return "\n".join(formatted_memories)
+            return "\n".join(memories)
             
         except Exception as e:
             logger.error(f"Failed to format memories: {str(e)}")
