@@ -30,7 +30,7 @@ class ModelInterface:
                 verbose=True
             )
             # Load personality traits
-            with open('static/json/charlotte_personality_traits.json', 'r') as f:
+            with open('static/json/roxy_personality_traits.json', 'r') as f:
                 self.personality = json.load(f)
             
             # Initialize memory manager
