@@ -1,0 +1,175 @@
+{
+    "validation": {
+        "schemes": ["http", "https"],
+        "content_types": ["text/html", "text/plain", "application/json"],
+        "timeouts": {
+            "connect": 5,
+            "read": 10
+        },
+        "max_redirects": 3
+    },
+    "response_codes": {
+        "success": [200, 201, 202, 203, 206],
+        "redirect": [301, 302, 307, 308],
+        "error": [400, 401, 403, 404, 500, 501, 502, 503]
+    },
+    "content_hints": {
+        "dynamic": {
+            "elements": ["article", "main", "section", "div[role='main']"],
+            "attributes": ["data-content", "data-dynamic", "data-load"]
+        },
+        "navigation": {
+            "elements": ["nav", "header", "footer", "aside"],
+            "attributes": ["role='navigation'", "aria-label='navigation'"]
+        },
+        "interactive": {
+            "elements": ["form", "button", "input", "select"],
+            "attributes": ["data-action", "data-trigger", "onclick"]
+        }
+    },
+    "extraction_priority": {
+        "high": ["article", "main", "[role='main']", ".content", ".main-content"],
+        "medium": ["section", "div.content", "div.text"],
+        "low": ["div", "span", "p"]
+    },
+    "helper_modules": {
+        "content_extraction": {
+            "readability-lxml": {
+                "purpose": "Extract clean article content",
+                "use_when": "Long-form content needs cleaning",
+                "auto_enable": true,
+                "config": {
+                    "min_text_length": 500,
+                    "retry_length": 250
+                }
+            },
+            "trafilatura": {
+                "purpose": "Advanced web content extraction",
+                "use_when": "Complex page structures",
+                "auto_enable": true,
+                "config": {
+                    "include_comments": false,
+                    "include_tables": true
+                }
+            },
+            "newspaper3k": {
+                "purpose": "News article extraction",
+                "use_when": "News content detection",
+                "auto_enable": false,
+                "config": {
+                    "fetch_images": false,
+                    "follow_links": false
+                }
+            },
+            "beautifulsoup4": {
+                "purpose": "Flexible HTML parsing",
+                "use_when": "Always - primary parser",
+                "auto_enable": true,
+                "config": {
+                    "parser": "html.parser",
+                    "detect_encoding": true
+                }
+            }
+        },
+        "text_processing": {
+            "nltk": {
+                "purpose": "Natural language processing support",
+                "use_when": "Content needs semantic analysis",
+                "auto_enable": false,
+                "config": {
+                    "download_required": ["punkt", "averaged_perceptron_tagger"],
+                    "max_tokens": 1000
+                }
+            },
+            "dateparser": {
+                "purpose": "Flexible date parsing",
+                "use_when": "Dates in various formats need standardization",
+                "auto_enable": true,
+                "config": {
+                    "languages": ["en"],
+                    "region": "US"
+                }
+            },
+            "python-dateutil": {
+                "purpose": "Robust date handling",
+                "use_when": "Complex date formats or ranges",
+                "auto_enable": true,
+                "config": {
+                    "fuzzy": true
+                }
+            }
+        },
+        "validation": {
+            "validators": {
+                "purpose": "URL and email validation",
+                "use_when": "Need to verify contact information",
+                "auto_enable": true,
+                "config": {
+                    "check_dns": false,
+                    "whitelist_localhost": false
+                }
+            },
+            "html5lib": {
+                "purpose": "Robust HTML parsing",
+                "use_when": "Dealing with malformed HTML",
+                "auto_enable": false,
+                "config": {
+                    "sanitize": true,
+                    "treebuilder": "dom"
+                }
+            }
+        },
+        "specialized": {
+            "price-parser": {
+                "purpose": "Extract and normalize prices",
+                "use_when": "Dealing with monetary values",
+                "auto_enable": true,
+                "config": {
+                    "default_currency": "USD",
+                    "normalize": true
+                }
+            },
+            "phonenumbers": {
+                "purpose": "Phone number parsing and validation",
+                "use_when": "Contact information present",
+                "auto_enable": true,
+                "config": {
+                    "region": "US",
+                    "format": "international"
+                }
+            },
+            "geocoder": {
+                "purpose": "Location data handling",
+                "use_when": "Geographic information present",
+                "auto_enable": false,
+                "config": {
+                    "provider": "nominatim",
+                    "timeout": 5
+                }
+            },
+            "pdfplumber": {
+                "purpose": "PDF content extraction",
+                "use_when": "PDF content detected",
+                "auto_enable": false,
+                "config": {
+                    "extract_images": false,
+                    "extract_tables": true
+                }
+            }
+        },
+        "module_control": {
+            "allow_model_override": true,
+            "fallback_strategy": "next_available",
+            "error_handling": {
+                "retry_count": 2,
+                "ignore_errors": ["TimeoutError", "ConnectionError"],
+                "raise_critical": ["SecurityError", "MemoryError"]
+            },
+            "performance": {
+                "concurrent_modules": true,
+                "max_processing_time": 30,
+                "memory_limit_mb": 500
+            }
+        }
+    }
+} 

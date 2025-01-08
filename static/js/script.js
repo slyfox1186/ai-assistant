@@ -1,24 +1,20 @@
 // MathJax Configuration
 window.MathJax = {
     tex: {
-        inlineMath: [['\\(', '\\)']],
-        displayMath: [['\\[', '\\]']],
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$', '$$'], ['\\[', '\\]']],
         processEscapes: true,
         processEnvironments: true,
-        processRefs: true,
-        digits: /^(?:[0-9]+(?:\{,\}[0-9]{3})*(?:\.[0-9]*)?|\.[0-9]+)/,
         packages: ['base', 'ams', 'noerrors', 'noundefined']
     },
     svg: {
         fontCache: 'global',
-        scale: 1,
-        minScale: .5,
+        scale: 1,                  // global scaling factor for all expressions
+        minScale: .5,             // smallest scaling factor to use
     },
     options: {
         enableMenu: false,
-        skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
-        processHtmlClass: 'math',
-        ignoreHtmlClass: 'no-math'
+        skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre']
     },
     startup: {
         typeset: false
@@ -76,13 +72,26 @@ document.addEventListener('DOMContentLoaded', function() {
     // Create custom renderer
     const renderer = new marked.Renderer();
 
+    // Custom message rendering based on type
+    function createMessage(content, isUser) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${isUser ? 'user-message' : 'assistant-message'}`;
+        
+        if (isUser) {
+            // User messages are always plain text
+            messageDiv.textContent = content;
+        } else {
+            // Assistant messages can contain markdown/formatting
+            messageDiv.innerHTML = marked.parse(content);
+        }
+        
+        return messageDiv;
+    }
+
     // Custom link rendering for maps
     renderer.link = function(href, title, text) {
-        console.log('Link rendering:', { href, title, text }); // Debug log
-        
         // Handle raw object input
         if (typeof href === 'object') {
-            console.log('Received object href:', href);
             if (href.href) {
                 href = href.href;
             } else if (href.raw) {
@@ -110,13 +119,42 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>`;
         }
 
-        // For regular links, ensure we preserve the original text and never use fallbacks
-        if (!text || text === 'undefined' || text === '[object Object]') {
-            console.error('Invalid link text:', text);
-            return `<a href="${href}" ${title ? `title="${title}"` : ''} target="_blank">${title || href}</a>`;
+        // For regular links, ensure we have descriptive text
+        let displayText = text;
+        if (!displayText || displayText === 'undefined' || displayText === '[object Object]' || displayText === href || displayText === 'Visit Website') {
+            try {
+                const url = new URL(href);
+                // Extract domain without TLD
+                const domain = url.hostname.split('.').slice(-2, -1)[0];
+                
+                if (domain) {
+                    // Capitalize first letter of each word and remove special chars
+                    const siteName = domain.split(/[-_]/)
+                        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+                        .join(' ');
+                    
+                    // Check URL path for common patterns
+                    const path = url.pathname.toLowerCase();
+                    if (path.includes('review')) {
+                        displayText = `${siteName} Reviews`;
+                    } else if (path.includes('order') || path.includes('delivery') || path.includes('pickup')) {
+                        displayText = `Order on ${siteName}`;
+                    } else if (path.includes('menu')) {
+                        displayText = `View Menu on ${siteName}`;
+                    } else if (path.includes('reservation') || path.includes('book')) {
+                        displayText = `Make Reservation on ${siteName}`;
+                    } else {
+                        displayText = title || `View on ${siteName}`;
+                    }
+                } else {
+                    displayText = title || 'Official Website';
+                }
+            } catch (e) {
+                displayText = title || 'Official Website';
+            }
         }
         
-        return `<a href="${href}" ${title ? `title="${title}"` : ''} target="_blank">${text}</a>`;
+        return `<a href="${href}" ${title ? `title="${title}"` : ''} target="_blank">${displayText}</a>`;
     };
 
     // Add renderer to marked options
@@ -152,7 +190,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Function to extract and store math expressions
     function extractMathExpressions(content) {
         // Quick check if there's any potential math content
-        if (!content.includes('\\[') && !content.includes('\\(')) {
+        if (!content.includes('$') && !content.includes('\\')) {
             return content;
         }
 
@@ -162,42 +200,16 @@ document.addEventListener('DOMContentLoaded', function() {
         // Process all types of math delimiters
         for (const type of ['display', 'inline']) {
             for (const delimiter of LATEX_DELIMITERS[type]) {
-                // Skip dollar sign delimiters - we'll handle currency separately
-                if (delimiter.start === '$') continue;
-                
                 let searchStart = 0;
                 while (true) {
                     // Find next opening delimiter
                     const startIdx = modifiedContent.indexOf(delimiter.start, searchStart);
                     if (startIdx === -1) break;
                     
-                    // Skip if it's escaped
-                    if (startIdx > 0 && modifiedContent[startIdx - 1] === '\\') {
-                        searchStart = startIdx + 1;
-                        continue;
-                    }
-                    
                     // Find matching closing delimiter
                     const endIdx = modifiedContent.indexOf(delimiter.end, startIdx + delimiter.start.length);
                     if (endIdx === -1) {
                         searchStart = startIdx + delimiter.start.length;
-                        continue;
-                    }
-                    
-                    // Skip if it's escaped
-                    if (endIdx > 0 && modifiedContent[endIdx - 1] === '\\') {
-                        searchStart = startIdx + 1;
-                        continue;
-                    }
-                    
-                    // Verify this is actually a math expression by checking content
-                    const mathContent = modifiedContent.slice(startIdx + delimiter.start.length, endIdx);
-                    
-                    // Skip if it's just numbers or simple text
-                    if (/^[\d\s.,$%]+$/.test(mathContent) || 
-                        /^[a-zA-Z\s]+$/.test(mathContent) ||
-                        mathContent.length < 2) {
-                        searchStart = endIdx + delimiter.end.length;
                         continue;
                     }
                     
@@ -269,27 +281,11 @@ document.addEventListener('DOMContentLoaded', function() {
         element.dataset.isNew = 'true';
         element.dataset.lastContent = content;
 
-        // Check for search or system messages
-        const isSearchMessage = content.includes('search_web(') || content.includes('Searching...');
-        if (isSearchMessage) {
-            content = content.replace(/`search_web\((.*?)\)`/, 'Searching for: $1');
-            content = content.replace(/```[\s\S]*?```/g, ''); // Remove code blocks
-        }
-
-        // Escape dollar signs in currency values
-        content = content.replace(/\$\d+(?:\.\d{2})?/g, match => match.replace('$', '\\$'));
-
         // Extract math expressions and replace with placeholders
         const processedContent = extractMathExpressions(content);
         
         // Parse markdown
         let htmlContent = marked.parse(processedContent);
-        
-        // Add appropriate classes for search/system messages
-        if (isSearchMessage) {
-            htmlContent = htmlContent.replace(/<pre><code>/g, '<pre class="search-message">');
-            htmlContent = htmlContent.replace(/<\/code><\/pre>/g, '</pre>');
-        }
         
         // Replace placeholders with span elements
         for (const [id] of mathExpressions) {
@@ -347,21 +343,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Initialize theme
     updateTheme(themeSlider.value);
-
-    function createMessage(text, isUser) {
-        const messageDiv = document.createElement('div');
-        messageDiv.className = `message ${isUser ? 'user-message' : 'assistant-message'}`;
-        
-        // For user messages, preserve whitespace and treat as plain text
-        if (isUser) {
-            messageDiv.style.whiteSpace = 'pre-wrap';
-            messageDiv.textContent = text;
-        } else {
-            // For assistant messages, continue using markdown parsing
-            messageDiv.innerHTML = marked.parse(text);
-        }
-        return messageDiv;
-    }
 
     let shouldAutoScroll = true;  // Track if we should auto-scroll
 
@@ -504,9 +485,11 @@ document.addEventListener('DOMContentLoaded', function() {
         // Always scroll for new user messages
         shouldAutoScroll = true;
         
-        // Create and display user message
-        const userMessage = userInput.value.trim();
-        const userMessageDiv = createMessage(userMessage, true);
+        // Create and display user message - preserve formatting
+        const userMessage = userInput.value;  // Don't trim to preserve whitespace
+        const userMessageDiv = document.createElement('div');
+        userMessageDiv.className = 'message user-message';
+        userMessageDiv.textContent = userMessage;  // textContent preserves whitespace
         messagesContainer.appendChild(userMessageDiv);
         scrollToBottom();
         
@@ -604,17 +587,15 @@ document.addEventListener('DOMContentLoaded', function() {
         clearMemoryBtn.disabled = true;
 
         try {
-            // Get special memories first to preserve them
-            const response = await fetch('/flush_redis', {
+            const response = await fetch('/clear_memory', {
                 method: 'POST'
             });
             const result = await response.json();
-            
             if (result.status === 'success') {
                 messagesContainer.innerHTML = '';
                 const messageDiv = document.createElement('div');
                 messageDiv.className = 'message assistant-message';
-                messageDiv.textContent = 'General memories cleared successfully. Special memories (like your personal information) have been preserved.';
+                messageDiv.textContent = 'Memory cleared successfully';
                 messagesContainer.appendChild(messageDiv);
             }
         } catch (error) {

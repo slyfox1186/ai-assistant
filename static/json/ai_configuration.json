@@ -16,14 +16,14 @@
         "api_keys": {
             "youtube": "${YOUTUBE_API_KEY}",
             "google": {
-                "api_key": "AIzaSyD4Vm7co689cNo-Rbznub85CY7YU4zqeOw",
-                "cse_id": "f2a9a9431a797430a"
+                "api_key": "${GOOGLE_API_KEY}",
+                "cse_id": "${GOOGLE_CSE_ID}"
             }
         }
     },
     "personality": {
-        "name": "Lotte",
-        "traits_file": "static/json/charlotte_personality_traits.json",
+        "name": "Roxy",
+        "traits_file": "static/json/roxy_personality_traits.json",
         "current_config": "config/personality/current_personality.json"
     },
     "nodes": {

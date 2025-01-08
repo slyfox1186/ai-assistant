@@ -129,75 +129,105 @@ class ModelInterface:
     def generate_streaming(self, prompt: str, conversation_history: List[Dict[str, str]] = None) -> Generator[Dict[str, Any], None, None]:
         """Generate streaming response from the model"""
         try:
-            # First, count tokens in the prompt
+            # Calculate available tokens
             prompt_tokens = self.count_tokens(prompt)
-            
-            # Count tokens in conversation history if it exists
-            history_tokens = 0
-            if conversation_history:
-                for msg in conversation_history:
-                    history_tokens += self.count_tokens(msg["content"])
-            
-            # Count system prompt tokens
+            history_tokens = sum(self.count_tokens(msg["content"]) for msg in (conversation_history or []))
             system_tokens = self.count_tokens(self._build_system_prompt())
-            
-            # Calculate total input tokens
             total_input_tokens = prompt_tokens + history_tokens + system_tokens
-            
-            # Calculate safe remaining tokens for output
             available_tokens = self.model.context_params.n_ctx - total_input_tokens
             
-            if available_tokens < 100:  # Minimum safe buffer
+            if available_tokens < 100:
                 yield {"error": "Not enough context space remaining for a response"}
                 return
 
+            # Trim conversation history if needed
             if conversation_history:
                 conversation_history = self._trim_conversation_history(
                     conversation_history,
                     int(self.max_tokens * 0.7)
                 )
 
-            is_directions_request = (
-                ("directions to" in prompt.lower()) or 
-                ("how do i get to" in prompt.lower()) or
-                ("route to" in prompt.lower()) or
-                ("navigate to" in prompt.lower()) or
-                (("from" in prompt.lower() and "to" in prompt.lower()) and 
-                 any(word in prompt.lower() for word in ["drive", "directions", "route", "navigate"]))
-            )
-
+            # Build conversation context
             conversation = []
             if conversation_history:
                 for msg in conversation_history[:-1]:
                     conversation.append(f"<|im_start|>{msg['role']}\n{msg['content']}<|im_end|>")
-            
+
+            # Handle web search if needed
             needs_current_info = self._needs_current_info(prompt)
             web_results = None
-            
             if needs_current_info:
                 web_results = self.search_web(prompt)
-                if web_results:
-                    formatted_prompt = f"""<|im_start|>system
+
+            # Build the appropriate prompt
+            formatted_prompt = self._build_formatted_prompt(
+                prompt, 
+                conversation, 
+                web_results,
+                "directions to" in prompt.lower() or "how do i get to" in prompt.lower()
+            )
+
+            # Generate the response
+            stream = self.model(
+                formatted_prompt,
+                max_tokens=available_tokens,
+                temperature=0.8,
+                top_p=0.95,
+                top_k=50,
+                repeat_penalty=1.2,
+                stream=True,
+                echo=False,
+                stop=["<|im_end|>", "<|im_start|>"]
+            )
+
+            # Stream the response
+            full_response = ""
+            for chunk in stream:
+                if chunk and isinstance(chunk, dict) and "choices" in chunk and chunk["choices"]:
+                    token = chunk["choices"][0]["text"]
+                    if token:
+                        full_response += token
+                        yield {"token": token}
+
+            # Handle memory operations after response is complete
+            if needs_current_info and web_results:
+                self._queue_memory_operation(web_results)
+
+        except Exception as e:
+            yield {"error": str(e)}
+
+    def _queue_memory_operation(self, content: str) -> None:
+        """Queue a memory operation to be processed asynchronously"""
+        try:
+            # Create a background thread for memory operation
+            from threading import Thread
+            thread = Thread(
+                target=self.memory.add_memory,
+                args=(content,),
+                kwargs={
+                    "memory_type": "general",
+                    "skip_confirmation": True
+                },
+                daemon=True  # Allow the thread to be terminated when main program exits
+            )
+            thread.start()
+        except Exception:
+            pass  # Fail silently as memory operations are non-critical
+
+    def _build_formatted_prompt(self, prompt: str, conversation: List[str], web_results: Optional[str], is_directions: bool) -> str:
+        """Build the appropriate formatted prompt based on the type of request"""
+        if web_results:
+            return f"""<|im_start|>system
 You are an AI assistant. Use your intelligence to provide the most helpful response based on this current information:
 
 {web_results}
 <|im_end|>
-
 <|im_start|>user
 {prompt}
 <|im_end|>
-
-<|im_start|>assistant
-"""
-                else:
-                    formatted_prompt = (
-                        f"<|im_start|>system\n{self._build_system_prompt()}<|im_end|>\n"
-                        f"{'\n'.join(conversation)}\n"
-                        f"<|im_start|>user\n{prompt}<|im_end|>\n"
-                        "<|im_start|>assistant\n"
-                    )
-            elif is_directions_request:
-                formatted_prompt = f"""<|im_start|>system
+<|im_start|>assistant"""
+        elif is_directions:
+            return f"""<|im_start|>system
 You are a professional directions expert with access to special memories. When handling directions:
 
 1. FIRST, if the query mentions "my home", "my address", or similar:
@@ -221,45 +251,19 @@ You are a professional directions expert with access to special memories. When h
 Current special memories to check for addresses:
 {self.memory.format_memories_for_prompt()}
 <|im_end|>
-
 <|im_start|>user
 {prompt}
 <|im_end|>
-
-<|im_start|>assistant
-"""
-            else:
-                formatted_prompt = (
-                    f"<|im_start|>system\n{self._build_system_prompt()}<|im_end|>\n"
-                    f"{'\n'.join(conversation)}\n"
-                    f"<|im_start|>user\n{prompt}<|im_end|>\n"
-                    "<|im_start|>assistant\n"
-                )
-
-            stream = self.model(
-                formatted_prompt,
-                max_tokens=available_tokens,  # Use all remaining space
-                temperature=0.8,
-                top_p=0.95,
-                top_k=50,
-                repeat_penalty=1.2,
-                stream=True,
-                echo=False,
-                stop=["<|im_end|>"]
-            )
-
-            for chunk in stream:
-                if chunk:
-                    if isinstance(chunk, dict):
-                        if "choices" in chunk and chunk["choices"]:
-                            token = chunk["choices"][0]["text"]
-                            if token:
-                                yield {"token": token}
-                    else:
-                        yield {"token": str(chunk)}
-
-        except Exception as e:
-            yield {"error": str(e)}
+<|im_start|>assistant"""
+        else:
+            return f"""<|im_start|>system
+{self._build_system_prompt()}
+<|im_end|>
+{'\n'.join(conversation)}
+<|im_start|>user
+{prompt}
+<|im_end|>
+<|im_start|>assistant"""
 
     def __del__(self):
         """Cleanup when the interface is destroyed"""
@@ -319,6 +323,16 @@ Current special memories to check for addresses:
             # Enhance query with date information if needed
             enhanced_query = self._enhance_search_query(query)
             results = self.web_scraper.search_google(enhanced_query)
+            
+            # Clean up URLs before formatting results
+            for result in results:
+                if 'url' in result:
+                    # Remove tracking parameters and clean URL
+                    url = result['url'].split('?')[0]  # Remove query parameters
+                    url = url.split('&ved=')[0]  # Remove Google tracking
+                    url = url.replace('&amp;', '&')  # Fix HTML entities
+                    result['url'] = url
+                    
             return self.web_scraper.format_search_results(results)
         except Exception as e:
             return f"Sorry, I couldn't search the web right now: {str(e)}"

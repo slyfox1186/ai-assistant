@@ -127,11 +127,11 @@ header {
 }
 
 .message {
-    padding: 10px 15px;
-    margin: 5px 0;
-    border-radius: 10px;
     max-width: 80%;
-    word-wrap: break-word;
+    padding: 1rem 1.25rem;
+    border-radius: 1rem;
+    animation: messageAppear 0.3s ease-out;
+    line-height: 1.5;
 }
 
 .message p {
@@ -185,33 +185,38 @@ header {
 }
 
 .user-message {
-    background-color: var(--message-user-bg, #2563eb);
-    color: white;
+    background-color: var(--message-user-bg);
+    color: var(--message-user-text);
     margin-left: auto;
+    border-bottom-right-radius: 0.25rem;
     white-space: pre-wrap;
     font-family: inherit;
-    word-break: break-word;
+}
+
+/* Override any code styling in user messages */
+.user-message pre,
+.user-message code {
+    all: unset;  /* Reset all styling */
+    white-space: pre-wrap;
+    font-family: inherit;
+    background: none;
+    padding: 0;
+    margin: 0;
+    border-radius: 0;
+}
+
+/* Ensure no code highlighting in user messages */
+.user-message .hljs {
+    all: unset;
+    white-space: pre-wrap;
+    font-family: inherit;
 }
 
 .assistant-message {
     background-color: var(--message-assistant-bg);
-    color: white;
+    color: var(--message-assistant-text);
     margin-right: auto;
-}
-
-.assistant-message pre {
-    background-color: var(--secondary-color);
-    padding: 10px;
-    border-radius: 5px;
-    overflow-x: auto;
-}
-
-.user-message pre {
-    background: none;
-    padding: 0;
-    margin: 0;
-    white-space: pre-wrap;
-    font-family: inherit;
+    border-bottom-left-radius: 0.25rem;
 }
 
 .input-container {
@@ -438,31 +443,4 @@ header {
 .message.system-message.warning {
     background-color: #ef4444;
     color: white;
-}
-
-/* Style for search and system messages */
-.assistant-message .search-message,
-.assistant-message .system-message {
-    font-style: italic;
-    opacity: 0.9;
-    background: none;
-    padding: 0;
-    font-family: inherit;
-    white-space: normal;
-}
-
-/* Keep code block styling only for actual code */
-.assistant-message pre:not(.search-message):not(.system-message) {
-    background-color: var(--secondary-color);
-    padding: 10px;
-    border-radius: 5px;
-    overflow-x: auto;
-}
-
-.user-message pre {
-    background: none;
-    padding: 0;
-    margin: 0;
-    white-space: pre-wrap;
-    font-family: inherit;
 } 
