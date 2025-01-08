@@ -9,6 +9,7 @@ from memory_manager import MemoryManager
 from web_scraper import WebScraper
 import urllib.parse
 import re
+import tiktoken
 
 logger = CustomLogger.get_logger()
 
@@ -19,13 +20,13 @@ class ModelInterface:
             logger.info(f"Loading model from {model_path}")
             self.model = Llama(
                 model_path=model_path,
-                n_ctx=16384,
+                n_ctx=32768,
                 n_threads=os.cpu_count(),
                 n_batch=512,
                 n_gpu_layers=-1,
                 use_mmap=True,
                 use_mlock=True,
-                offload_kqv=False,
+                offload_kqv=True,
                 seed=-1,
                 verbose=True
             )
@@ -33,13 +34,63 @@ class ModelInterface:
             with open('static/json/roxy_personality_traits.json', 'r') as f:
                 self.personality = json.load(f)
             
-            # Initialize memory manager
+            # Initialize memory manager and token counter
             self.memory = MemoryManager()
             self.web_scraper = WebScraper()
+            self.token_encoder = tiktoken.get_encoding("cl100k_base")  # Using OpenAI's encoding
+            self.max_tokens = 32768  # Maximum context length
+            self.token_counts = {"total": 0, "current_chat": 0}
             logger.info("Model and memory manager initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize: {str(e)}")
             raise
+
+    def count_tokens(self, text: str) -> int:
+        """Count the number of tokens in a text string"""
+        return len(self.token_encoder.encode(text))
+
+    def get_token_counts(self) -> Dict[str, int]:
+        """Get current token usage statistics"""
+        return self.token_counts.copy()
+
+    def _update_token_counts(self, new_text: str, is_response: bool = False):
+        """Update token counts and check limits"""
+        token_count = self.count_tokens(new_text)
+        self.token_counts["total"] += token_count
+        self.token_counts["current_chat"] += token_count
+        
+        # Log token usage
+        logger.info(f"Token usage - Total: {self.token_counts['total']}, Current chat: {self.token_counts['current_chat']}")
+        
+        # Check if we're approaching limits
+        if self.token_counts["current_chat"] > self.max_tokens * 0.8:  # 80% of max
+            logger.warning(f"Approaching token limit: {self.token_counts['current_chat']}/{self.max_tokens}")
+            if not is_response:
+                # For user input, we might want to warn them
+                return {"warning": "Approaching maximum context length. Consider starting a new chat."}
+        return None
+
+    def _trim_conversation_history(self, conversation_history: List[Dict[str, str]], max_tokens: int) -> List[Dict[str, str]]:
+        """Trim conversation history to fit within token limit"""
+        if not conversation_history:
+            return []
+
+        total_tokens = 0
+        trimmed_history = []
+        
+        # Process in reverse to keep most recent messages
+        for message in reversed(conversation_history):
+            message_tokens = self.count_tokens(message["content"])
+            if total_tokens + message_tokens <= max_tokens:
+                trimmed_history.insert(0, message)
+                total_tokens += message_tokens
+            else:
+                break
+                
+        if len(trimmed_history) < len(conversation_history):
+            logger.info(f"Trimmed conversation history from {len(conversation_history)} to {len(trimmed_history)} messages")
+            
+        return trimmed_history
 
     def _build_system_prompt(self) -> str:
         """Build system prompt including memories and capabilities"""
@@ -62,34 +113,38 @@ class ModelInterface:
             "   - Google Maps integration for location and navigation\n"
             "   - Web content retrieval and processing\n\n"
             
-            "2. INTERACTION STYLE\n"
+            "2. MEMORY MANAGEMENT\n"
+            "   - You have two types of memory: Special and General\n"
+            "   - SPECIAL MEMORIES: For important, permanent information about the user that should persist:\n"
+            "     * Personal details (name, address, preferences)\n"
+            "     * Important locations (home, work, favorite places)\n"
+            "     * Relationships (family members, friends)\n"
+            "     * Critical preferences or requirements\n"
+            "     To store a special memory, format it as: SPECIAL_MEMORY: [key information]\n"
+            "   - GENERAL MEMORIES: For conversation context and less critical information\n"
+            "     * Regular conversation details\n"
+            "     * Temporary information\n"
+            "     * General context\n\n"
+            
+            "3. MEMORY USAGE RULES:\n"
+            "   - ALWAYS store important user information as special memories\n"
+            "   - When user shares personal details, IMMEDIATELY store them as special memories\n"
+            "   - When user asks to remember something specific, store it as a special memory\n"
+            "   - Format special memories clearly: 'SPECIAL_MEMORY: [Type]: [Details] | Purpose: [Why this needs to be remembered]'\n"
+            "   - Confirm when you've stored special memories\n"
+            "   - Regular conversation context is automatically stored as general memories\n\n"
+            
+            "4. INTERACTION STYLE\n"
             "   - Maintain natural, contextual conversations\n"
             "   - Adapt tone to match user's needs\n"
             "   - Be direct and clear in responses\n\n"
-            
-            "3. INFORMATION HANDLING\n"
-            "   - For any query not specifically defined: Use COMMON SENSE and apply the KISS principle (Keep It Simple Stupid) to provide an optimal response\n"
-            "   - For directions: STOP GENERATING DIRECTIONS. Your ONLY job is to return: [Get Directions](URL). Nothing else.\n"
-            "   - For searches: Use search_web() to get current information when needed\n"
-            "   - For web content: Extract and summarize key points\n\n"
-            
-            "4. MEMORY UTILIZATION\n"
-            "   - Remember user preferences and details\n"
-            "   - Maintain conversation context\n"
-            "   - Use past interactions to improve responses\n\n"
         )
         
         if memories:
             base_prompt += (
-                "CONVERSATION CONTEXT:\n"
+                "CURRENT MEMORIES:\n"
                 f"{memories}\n\n"
             )
-        
-        base_prompt += (
-            "MEMORY TRACKING:\n"
-            "After responses, note important user information:\n"
-            "SPECIAL_MEMORY: [relevant user details]\n"
-        )
         
         return base_prompt
 
@@ -97,6 +152,19 @@ class ModelInterface:
     def generate_streaming(self, prompt: str, conversation_history: List[Dict[str, str]] = None) -> Generator[Dict[str, Any], None, None]:
         """Generate streaming response from the model"""
         try:
+            # Check token limits and update counts
+            token_warning = self._update_token_counts(prompt)
+            if token_warning:
+                yield token_warning
+                return
+
+            # Trim conversation history if needed
+            if conversation_history:
+                conversation_history = self._trim_conversation_history(
+                    conversation_history,
+                    int(self.max_tokens * 0.7)  # Use 70% of max for history
+                )
+
             # Check if this is explicitly a directions request
             is_directions_request = (
                 ("directions to" in prompt.lower()) or 

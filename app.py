@@ -61,9 +61,10 @@ def chat():
                     # Handle special memories if present
                     if "SPECIAL_MEMORY:" in full_response:
                         memory_parts = full_response.split("SPECIAL_MEMORY:", 1)
+                        # Store only the special memory part
                         model.memory.add_memory(memory_parts[1].strip(), memory_type='special')
-                        model.memory.add_memory(memory_parts[0].strip())
                     else:
+                        # Store as regular memory
                         model.memory.add_memory(full_response)
 
                     # Add to conversation history
