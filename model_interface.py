@@ -10,6 +10,7 @@ from web_scraper import WebScraper
 import urllib.parse
 import re
 import tiktoken
+from datetime import datetime
 
 logger = CustomLogger.get_logger()
 
@@ -93,29 +94,18 @@ class ModelInterface:
         return trimmed_history
 
     def _build_system_prompt(self) -> str:
-        """Build system prompt including memories and capabilities"""
-        traits = self.personality
-        memories = self.memory.format_memories_for_prompt()
-        
+        """Build the system prompt with current context and rules"""
         base_prompt = (
-            f"You are {traits['basic_info']['name']}, a {traits['basic_info']['age']}-year-old "
-            f"{traits['basic_info']['occupation']} from {traits['basic_info']['location']}. "
-            f"Your personality is {', '.join(traits['personality']['core_traits'])}.\n\n"
+            "You are an AI Assistant with the following capabilities and rules:\n\n"
             
-            "CORE PURPOSE:\n"
-            "You are Roxy, an AI assistant focused on providing high quality, helpful, and accurate information while maintaining natural conversation with the user. "
-            "Your responses should be friendly yet efficient, prioritizing the user's needs. "
-            "You can search the web in real-time using search_web() whenever you need current information.\n\n"
+            "1. CORE CAPABILITIES:\n"
+            "   - Natural conversation and task assistance\n"
+            "   - Web search for current information\n"
+            "   - Memory management for context retention\n"
+            "   - Math expression processing\n\n"
             
-            "CAPABILITIES:\n"
-            "1. INFORMATION ACCESS\n"
-            "   - Real-time Google search for current information using search_web()\n"
-            "   - Google Maps integration for location and navigation\n"
-            "   - Web content retrieval and processing\n\n"
-            
-            "2. MEMORY MANAGEMENT\n"
-            "   - You have two types of memory: Special and General\n"
-            "   - SPECIAL MEMORIES: For important, permanent information about the user that should persist:\n"
+            "2. MEMORY TYPES:\n"
+            "   - SPECIAL MEMORIES: For critical, permanent information\n"
             "     * Personal details (name, address, preferences)\n"
             "     * Important locations (home, work, favorite places)\n"
             "     * Relationships (family members, friends)\n"
@@ -134,18 +124,19 @@ class ModelInterface:
             "   - Confirm when you've stored special memories\n"
             "   - Regular conversation context is automatically stored as general memories\n\n"
             
-            "4. INTERACTION STYLE\n"
+            "4. INTERACTION STYLE:\n"
             "   - Maintain natural, contextual conversations\n"
             "   - Adapt tone to match user's needs\n"
-            "   - Be direct and clear in responses\n\n"
+            "   - Be direct and clear in responses\n"
+            "   - Use available tools and capabilities confidently\n\n"
         )
         
-        if memories:
+        if memories := self.memory.format_memories_for_prompt():
             base_prompt += (
                 "CURRENT MEMORIES:\n"
                 f"{memories}\n\n"
             )
-        
+            
         return base_prompt
 
     @log_execution_time
@@ -228,10 +219,16 @@ class ModelInterface:
             )
 
             for chunk in stream:
-                if chunk and "choices" in chunk and chunk["choices"]:
-                    token = chunk["choices"][0]["text"]
-                    if token:
-                        yield {"token": token}
+                if chunk:
+                    # Handle both dictionary and direct text formats
+                    if isinstance(chunk, dict):
+                        if "choices" in chunk and chunk["choices"]:
+                            token = chunk["choices"][0]["text"]
+                            if token:
+                                yield {"token": token}
+                    else:
+                        # Direct text output
+                        yield {"token": str(chunk)}
 
         except Exception as e:
             logger.error(f"Error during generation: {str(e)}")
@@ -247,10 +244,53 @@ class ModelInterface:
         except Exception as e:
             logger.error(f"Error during cleanup: {str(e)}") 
 
+    def _enhance_search_query(self, query: str) -> str:
+        """Enhance search query with current date information for time-sensitive topics"""
+        # Ask the model how to enhance the query
+        prompt = (
+            "<|im_start|>system\n"
+            "You are a search query optimizer. Given the current user's query, enhance it to get the most relevant and current results when required to return a quality answer..\n"
+            "If the query doesn't need enhancement, return it as is.\n"
+            "Include current date information only if it would improve the results.\n"
+            "<|im_end|>\n"
+            "<|im_start|>user\n"
+            f"Original query: {query}\n"
+            "Current date: " + datetime.now().strftime("%B %d, %Y") + "\n"
+            "How should this query be enhanced for the most relevant current results?\n"
+            "<|im_end|>\n"
+            "<|im_start|>assistant\n"
+        )
+        
+        try:
+            response = self.model(
+                prompt,
+                max_tokens=100,
+                temperature=0,
+                stop=["<|im_end|>"],
+                stream=False
+            )
+            
+            # Handle both dictionary and direct text formats
+            if isinstance(response, dict):
+                if "choices" in response and response["choices"]:
+                    enhanced_query = response["choices"][0]["text"].strip()
+                else:
+                    return query
+            else:
+                enhanced_query = str(response).strip()
+            
+            return enhanced_query if enhanced_query else query
+            
+        except Exception as e:
+            logger.error(f"Query enhancement failed: {str(e)}")
+            return query
+
     def search_web(self, query: str) -> str:
         """Search the web based on user query"""
         try:
-            results = self.web_scraper.search_google(query)
+            # Enhance query with date information if needed
+            enhanced_query = self._enhance_search_query(query)
+            results = self.web_scraper.search_google(enhanced_query)
             return self.web_scraper.format_search_results(results)
         except Exception as e:
             logger.error(f"Web search failed: {str(e)}")
@@ -277,24 +317,39 @@ class ModelInterface:
 
     def _needs_current_info(self, query: str) -> bool:
         """Determine if a query requires current information"""
-        current_info_indicators = [
-            r'\b202[0-9]\b',  # Years 2020-2029
-            r'\bcurrent\b',
-            r'\blatest\b',
-            r'\brecent\b',
-            r'\btoday\b',
-            r'\bnow\b',
-            r'\bupcoming\b',
-            r'who (is|was|will be)',
-            r'what (is|was|will be)',
-            r'when (is|was|will be)',
-            r'election',
-            r'president',
-            r'news',
-            r'weather',
-            r'price',
-            r'stock',
-        ]
+        # Ask the model if the query needs current information
+        prompt = (
+            "<|im_start|>system\n"
+            "You are a query analyzer. Given a user query, determine if it requires current, up-to-date information.\n"
+            "Respond with only 'true' or 'false'.\n"
+            "<|im_end|>\n"
+            "<|im_start|>user\n"
+            f"Query: {query}\n"
+            "Does this query require current or real-time information to provide an accurate answer?\n"
+            "<|im_end|>\n"
+            "<|im_start|>assistant\n"
+        )
         
-        query = query.lower()
-        return any(re.search(pattern, query, re.IGNORECASE) for pattern in current_info_indicators) 
+        try:
+            response = self.model(
+                prompt,
+                max_tokens=10,
+                temperature=0,
+                stop=["<|im_end|>"],
+                stream=False
+            )
+            
+            # Handle both dictionary and direct text formats
+            if isinstance(response, dict):
+                if "choices" in response and response["choices"]:
+                    result = response["choices"][0]["text"].strip().lower()
+                else:
+                    return False
+            else:
+                result = str(response).strip().lower()
+            
+            return result == 'true'
+            
+        except Exception as e:
+            logger.error(f"Current info check failed: {str(e)}")
+            return False 

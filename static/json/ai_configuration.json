@@ -6,6 +6,11 @@
                 "host": "localhost",
                 "port": 6379,
                 "db": 0
+            },
+            "limits": {
+                "max_stored_memories": 5000,
+                "max_context_memories": 30,
+                "max_token_limit": 32768
             }
         },
         "api_keys": {

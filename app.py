@@ -58,8 +58,16 @@ def chat():
                 # After streaming complete, process the full response
                 full_response = ''.join(current_response)
                 if full_response:
+                    # Skip storing if this is just a recitation of memories
+                    if any(skip_phrase in full_response.lower() for skip_phrase in [
+                        "here are your special memories",
+                        "here are all of your special memories",
+                        "here is the sequence of instructions",
+                        "here are the contents of your special memories"
+                    ]):
+                        logger.debug("Skipping memory storage for memory recitation")
                     # Handle special memories if present
-                    if "SPECIAL_MEMORY:" in full_response:
+                    elif "SPECIAL_MEMORY:" in full_response:
                         memory_parts = full_response.split("SPECIAL_MEMORY:", 1)
                         # Store only the special memory part
                         model.memory.add_memory(memory_parts[1].strip(), memory_type='special')
@@ -121,10 +129,18 @@ def clear_memory():
 
 @app.route('/flush_redis', methods=['POST'])
 def flush_redis():
-    """Flush entire Redis database"""
+    """Flush Redis database while preserving special memories"""
     try:
+        # Get special memories before clearing
+        special_memory = model.memory.get_special_memory()
+        
         # Flush all data from Redis
         model.memory.redis.flushall()
+        
+        # Restore special memories if they existed
+        if special_memory:
+            model.memory.redis.json().set('memory:special', '$', special_memory)
+            model.memory.redis.persist('memory:special')  # Make it permanent
         
         # Clear conversation history
         global conversation_history
@@ -132,7 +148,7 @@ def flush_redis():
         
         return {
             "status": "success",
-            "message": "Redis database flushed successfully"
+            "message": "Redis database flushed successfully while preserving special memories"
         }
     except Exception as e:
         logger.error(f"Error flushing Redis: {str(e)}")

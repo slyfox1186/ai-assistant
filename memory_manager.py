@@ -25,6 +25,15 @@ class MemoryManager:
     def __init__(self, host='localhost', port=6379, db=0):
         """Initialize Redis connection and memory structure"""
         try:
+            # Load configuration
+            with open('static/json/ai_configuration.json', 'r') as f:
+                config = json.load(f)
+            
+            # Get memory limits from config
+            self.memory_limits = config['system']['memory_settings']['limits']
+            self.max_stored_memories = self.memory_limits['max_stored_memories']
+            self.max_context_memories = self.memory_limits['max_context_memories']
+            
             # Initialize Redis connection with optimized settings
             self.redis = redis.Redis(
                 host=host,
@@ -173,14 +182,12 @@ class MemoryManager:
     def add_memory(self, content: str, memory_type: str = 'long_term') -> bool:
         """Add a new memory with vector embedding and deduplication"""
         try:
-            # Special Memory Handling
-            if memory_type == 'special' or "SPECIAL_MEMORY:" in content:
-                # Extract and format special content
-                if "SPECIAL_MEMORY:" in content:
-                    memory_parts = content.split("SPECIAL_MEMORY:", 1)
-                    special_content = memory_parts[1].strip()
-                else:
-                    special_content = content.strip()
+            # Simple special memory check - trust the model's classification
+            is_special = memory_type == 'special'
+            
+            if is_special:
+                # Format special content
+                special_content = content.strip()
                 
                 # Get existing special memories to append/update
                 existing_special = self.get_special_memory()
@@ -194,7 +201,7 @@ class MemoryManager:
                 embedding = self.embedder.encode(special_content).astype(np.float32).tolist()
                 timestamp = datetime.now().isoformat()
                 
-                # Store special memory with optimized persistence
+                # Store special memory
                 memory = {
                     'content': special_content,
                     'timestamp': timestamp,
@@ -203,25 +210,19 @@ class MemoryManager:
                     'hash': hashlib.sha256(special_content.encode()).hexdigest()
                 }
                 
-                # Use pipelining for better performance and atomicity
+                # Use pipelining for better performance
                 pipe = self.redis.pipeline(transaction=True)
-                
-                # Store the memory
                 key = 'memory:special'
                 pipe.json().set(key, '$', memory)
-                pipe.persist(key)  # Make it permanent
-                
-                # Add to timestamp index with high score for priority
-                pipe.zadd('memory:timestamps', {key: float('inf')})  # Always keep at top
+                pipe.persist(key)
+                pipe.zadd('memory:timestamps', {key: float('inf')})
                 pipe.persist('memory:timestamps')
-                
-                # Execute all commands atomically
                 pipe.execute()
                 
                 logger.info(f"Special memory updated: {special_content[:100]}...")
                 return True
             
-            # For long-term memories
+            # For regular memories
             content_hash = hashlib.sha256(content.encode()).hexdigest()
             
             # Check for duplicates using vector similarity
@@ -263,8 +264,8 @@ class MemoryManager:
             pipe.zadd('memory:timestamps', {key: time.time()})
             pipe.persist('memory:timestamps')
             
-            # Maintain memory limit (keep last 1000 memories)
-            pipe.zremrangebyrank('memory:timestamps', 0, -1001)
+            # Maintain memory limit from configuration
+            pipe.zremrangebyrank('memory:timestamps', 0, -(self.max_stored_memories + 1))
             
             # Execute all commands atomically
             pipe.execute()
@@ -451,14 +452,49 @@ class MemoryManager:
             else:
                 formatted_memories.append("No special memories stored yet.")
             
-            # Only add recent context if it exists
-            memories = self.get_recent_memories(limit=3)  # Reduced to 3 for less noise
-            if memories:
-                formatted_memories.append("\n=== 📝 RECENT CONTEXT ===")
-                for memory in memories:
+            # Get a mix of recent and relevant memories
+            # First, get 5 most recent memories for immediate context
+            recent_memories = self.get_recent_memories(limit=5)
+            
+            # Then get relevant memories if we have a recent memory to compare against
+            relevant_memories = []
+            if recent_memories:
+                # Use the most recent memory as the query for finding relevant ones
+                query = recent_memories[0].get('content', '')
+                relevant_memories = self.find_similar_memories(query, k=5)
+                
+                # Filter out memories that are too similar (likely duplicates)
+                seen_hashes = set()
+                filtered_memories = []
+                for memory in relevant_memories:
                     content = memory.get('content', '').strip()
-                    if content and not content.startswith('SPECIAL_MEMORY:'):
+                    memory_hash = hashlib.sha256(content.encode()).hexdigest()
+                    if memory_hash not in seen_hashes and memory.get('similarity', 0) > 0.5:  # Only include if similarity > 0.5
+                        seen_hashes.add(memory_hash)
+                        filtered_memories.append(memory)
+                relevant_memories = filtered_memories
+
+            # Combine and deduplicate memories
+            all_memories = []
+            seen_contents = set()
+            
+            # Add recent memories first
+            if recent_memories:
+                formatted_memories.append("\n=== 📝 RECENT CONTEXT ===")
+                for memory in recent_memories:
+                    content = memory.get('content', '').strip()
+                    if content and not content.startswith('SPECIAL_MEMORY:') and content not in seen_contents:
                         formatted_memories.append(f"- {content}")
+                        seen_contents.add(content)
+            
+            # Add relevant memories
+            if relevant_memories:
+                formatted_memories.append("\n=== 🔍 RELEVANT CONTEXT ===")
+                for memory in relevant_memories:
+                    content = memory.get('content', '').strip()
+                    if content and not content.startswith('SPECIAL_MEMORY:') and content not in seen_contents:
+                        formatted_memories.append(f"- {content}")
+                        seen_contents.add(content)
             
             return "\n".join(formatted_memories)
             

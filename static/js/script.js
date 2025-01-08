@@ -239,11 +239,24 @@ document.addEventListener('DOMContentLoaded', function() {
         element.dataset.isNew = 'true';
         element.dataset.lastContent = content;
 
+        // Check for search or system messages
+        const isSearchMessage = content.includes('search_web(') || content.includes('Searching...');
+        if (isSearchMessage) {
+            content = content.replace(/`search_web\((.*?)\)`/, 'Searching for: $1');
+            content = content.replace(/```[\s\S]*?```/g, ''); // Remove code blocks
+        }
+
         // Extract math expressions and replace with placeholders
         const processedContent = extractMathExpressions(content);
         
         // Parse markdown
         let htmlContent = marked.parse(processedContent);
+        
+        // Add appropriate classes for search/system messages
+        if (isSearchMessage) {
+            htmlContent = htmlContent.replace(/<pre><code>/g, '<pre class="search-message">');
+            htmlContent = htmlContent.replace(/<\/code><\/pre>/g, '</pre>');
+        }
         
         // Replace placeholders with span elements
         for (const [id] of mathExpressions) {
@@ -305,7 +318,15 @@ document.addEventListener('DOMContentLoaded', function() {
     function createMessage(text, isUser) {
         const messageDiv = document.createElement('div');
         messageDiv.className = `message ${isUser ? 'user-message' : 'assistant-message'}`;
-        messageDiv.textContent = text;
+        
+        // For user messages, preserve whitespace and treat as plain text
+        if (isUser) {
+            messageDiv.style.whiteSpace = 'pre-wrap';
+            messageDiv.textContent = text;
+        } else {
+            // For assistant messages, continue using markdown parsing
+            messageDiv.innerHTML = marked.parse(text);
+        }
         return messageDiv;
     }
 
@@ -452,9 +473,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Create and display user message
         const userMessage = userInput.value.trim();
-        const userMessageDiv = document.createElement('div');
-        userMessageDiv.className = 'message user-message';
-        userMessageDiv.textContent = userMessage;
+        const userMessageDiv = createMessage(userMessage, true);
         messagesContainer.appendChild(userMessageDiv);
         scrollToBottom();
         
@@ -552,15 +571,17 @@ document.addEventListener('DOMContentLoaded', function() {
         clearMemoryBtn.disabled = true;
 
         try {
-            const response = await fetch('/clear_memory', {
+            // Get special memories first to preserve them
+            const response = await fetch('/flush_redis', {
                 method: 'POST'
             });
             const result = await response.json();
+            
             if (result.status === 'success') {
                 messagesContainer.innerHTML = '';
                 const messageDiv = document.createElement('div');
                 messageDiv.className = 'message assistant-message';
-                messageDiv.textContent = 'Memory cleared successfully';
+                messageDiv.textContent = 'General memories cleared successfully. Special memories (like your personal information) have been preserved.';
                 messagesContainer.appendChild(messageDiv);
             }
         } catch (error) {
