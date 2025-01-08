@@ -1,20 +1,24 @@
 // MathJax Configuration
 window.MathJax = {
     tex: {
-        inlineMath: [['$', '$'], ['\\(', '\\)']],
-        displayMath: [['$$', '$$'], ['\\[', '\\]']],
+        inlineMath: [['\\(', '\\)']],
+        displayMath: [['\\[', '\\]']],
         processEscapes: true,
         processEnvironments: true,
+        processRefs: true,
+        digits: /^(?:[0-9]+(?:\{,\}[0-9]{3})*(?:\.[0-9]*)?|\.[0-9]+)/,
         packages: ['base', 'ams', 'noerrors', 'noundefined']
     },
     svg: {
         fontCache: 'global',
-        scale: 1,                  // global scaling factor for all expressions
-        minScale: .5,             // smallest scaling factor to use
+        scale: 1,
+        minScale: .5,
     },
     options: {
         enableMenu: false,
-        skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+        skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
+        processHtmlClass: 'math',
+        ignoreHtmlClass: 'no-math'
     },
     startup: {
         typeset: false
@@ -148,7 +152,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Function to extract and store math expressions
     function extractMathExpressions(content) {
         // Quick check if there's any potential math content
-        if (!content.includes('$') && !content.includes('\\')) {
+        if (!content.includes('\\[') && !content.includes('\\(')) {
             return content;
         }
 
@@ -158,16 +162,42 @@ document.addEventListener('DOMContentLoaded', function() {
         // Process all types of math delimiters
         for (const type of ['display', 'inline']) {
             for (const delimiter of LATEX_DELIMITERS[type]) {
+                // Skip dollar sign delimiters - we'll handle currency separately
+                if (delimiter.start === '$') continue;
+                
                 let searchStart = 0;
                 while (true) {
                     // Find next opening delimiter
                     const startIdx = modifiedContent.indexOf(delimiter.start, searchStart);
                     if (startIdx === -1) break;
                     
+                    // Skip if it's escaped
+                    if (startIdx > 0 && modifiedContent[startIdx - 1] === '\\') {
+                        searchStart = startIdx + 1;
+                        continue;
+                    }
+                    
                     // Find matching closing delimiter
                     const endIdx = modifiedContent.indexOf(delimiter.end, startIdx + delimiter.start.length);
                     if (endIdx === -1) {
                         searchStart = startIdx + delimiter.start.length;
+                        continue;
+                    }
+                    
+                    // Skip if it's escaped
+                    if (endIdx > 0 && modifiedContent[endIdx - 1] === '\\') {
+                        searchStart = startIdx + 1;
+                        continue;
+                    }
+                    
+                    // Verify this is actually a math expression by checking content
+                    const mathContent = modifiedContent.slice(startIdx + delimiter.start.length, endIdx);
+                    
+                    // Skip if it's just numbers or simple text
+                    if (/^[\d\s.,$%]+$/.test(mathContent) || 
+                        /^[a-zA-Z\s]+$/.test(mathContent) ||
+                        mathContent.length < 2) {
+                        searchStart = endIdx + delimiter.end.length;
                         continue;
                     }
                     
@@ -245,6 +275,9 @@ document.addEventListener('DOMContentLoaded', function() {
             content = content.replace(/`search_web\((.*?)\)`/, 'Searching for: $1');
             content = content.replace(/```[\s\S]*?```/g, ''); // Remove code blocks
         }
+
+        // Escape dollar signs in currency values
+        content = content.replace(/\$\d+(?:\.\d{2})?/g, match => match.replace('$', '\\$'));
 
         // Extract math expressions and replace with placeholders
         const processedContent = extractMathExpressions(content);
